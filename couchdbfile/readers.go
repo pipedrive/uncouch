@@ -1,7 +1,6 @@
 package couchdbfile
 
 import (
-	"bytes"
 	"fmt"
 
 	"github.com/pipedrive/uncouch/leakybucket"
@@ -19,8 +18,7 @@ func (cf *CouchDbFile) ReadIDNode(offset int64) (*KpNodeID, *KvNode, error) {
 		return nil, nil, err
 	}
 	defer leakybucket.Put(buf)
-	bufReader := bytes.NewReader(*buf)
-	s, err := erldeser.New(bufReader)
+	s, err := erldeser.New(*buf)
 	if err != nil {
 		slog.Error(err)
 		return nil, nil, err
@@ -64,8 +62,7 @@ func (cf *CouchDbFile) ReadSeqNode(offset int64) (*KpNodeSeq, *KvNode, error) {
 		return nil, nil, err
 	}
 	defer leakybucket.Put(buf)
-	bufReader := bytes.NewReader(*buf)
-	s, err := erldeser.New(bufReader)
+	s, err := erldeser.New(*buf)
 	if err != nil {
 		slog.Error(err)
 		return nil, nil, err
@@ -113,8 +110,7 @@ func (cf *CouchDbFile) ReadDbHeader() (*DbHeader, error) {
 		return nil, err
 	}
 	defer leakybucket.Put(buf)
-	bufReader := bytes.NewReader(*buf)
-	s, err := erldeser.New(bufReader)
+	s, err := erldeser.New(*buf)
 	if err != nil {
 		slog.Error(err)
 		return nil, err

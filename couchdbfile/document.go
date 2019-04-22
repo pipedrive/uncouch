@@ -15,8 +15,7 @@ func (cf *CouchDbFile) WriteDocument(di *DocumentInfo, output *bytes.Buffer) err
 		slog.Error(err)
 		return err
 	}
-	docBytesReader := *bytes.NewReader(*docBytes)
-	scanner, err := erldeser.New(&docBytesReader)
+	scanner, err := erldeser.New(*docBytes)
 	if err != nil {
 		slog.Error(err)
 		return err

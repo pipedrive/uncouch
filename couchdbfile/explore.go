@@ -50,8 +50,7 @@ func (cf *CouchDbFile) Explore() error {
 								return err
 							}
 						*/
-						docBytesReader := *bytes.NewReader(*docBytes)
-						scanner, err := erldeser.New(&docBytesReader)
+						scanner, err := erldeser.New(*docBytes)
 						if err != nil {
 							slog.Error(err)
 							return err
