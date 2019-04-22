@@ -5,16 +5,18 @@ import (
 
 	"github.com/pipedrive/uncouch/couchbytes"
 	"github.com/pipedrive/uncouch/erldeser"
+	"github.com/pipedrive/uncouch/leakybucket"
 )
 
 // WriteDocument writes document as JSON object into output buffer
 func (cf *CouchDbFile) WriteDocument(di *DocumentInfo, output *bytes.Buffer) error {
 	// Get buffer
-	docBytes, err := couchbytes.ReadDocument(cf.input, di.Revisions[len(di.Revisions)-1].Offset)
+	docBytes, err := couchbytes.ReadDocumentBytes(cf.input, di.Revisions[len(di.Revisions)-1].Offset)
 	if err != nil {
 		slog.Error(err)
 		return err
 	}
+	defer leakybucket.PutBytes(docBytes)
 	scanner, err := erldeser.New(*docBytes)
 	if err != nil {
 		slog.Error(err)

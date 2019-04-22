@@ -2,14 +2,19 @@
 // to reduce burden on GC
 package leakybucket
 
-var freeList = make(chan *[]byte, 100)
+import "bytes"
 
-// Get returns byte slice with cap at least the size provided
+var (
+	freeByteList   = make(chan *[]byte, 10)
+	freeBufferList = make(chan *bytes.Buffer, 10)
+)
+
+// GetBytes returns byte slice with cap at least the size provided
 // and len == size.
-// Get panics if it can not provide byte slice
-func Get(size int32) (b *[]byte) {
+// GetBytes panics if it can not provide byte slice
+func GetBytes(size int32) (b *[]byte) {
 	select {
-	case b = <-freeList:
+	case b = <-freeByteList:
 		if int32(cap(*b)) < size {
 			t := make([]byte, size)
 			b = &t
@@ -25,12 +30,35 @@ func Get(size int32) (b *[]byte) {
 	return b
 }
 
-// Put tries to add provide slice to free list for reuse.
-func Put(b *[]byte) {
+// PutBytes adds byte array to reuse list
+func PutBytes(b *[]byte) {
 	select {
-	case freeList <- b:
+	case freeByteList <- b:
 		// Buffer on free list; nothing more to do.
 	default:
 		// Free list full, just carry on.
 	}
+}
+
+// GetBuffer returns bytes.Buffer object, trying to reuse if possible
+func GetBuffer() (b *bytes.Buffer) {
+	select {
+	case b = <-freeBufferList:
+	default:
+		presizeBytes := make([]byte, 0, 1024*1024*5)
+		b = bytes.NewBuffer(presizeBytes)
+	}
+	return b
+}
+
+// PutBuffer adds bytes.Buffer object to reuse list
+func PutBuffer(b *bytes.Buffer) {
+	b.Reset()
+	select {
+	case freeBufferList <- b:
+		// Buffer on free list; nothing more to do.
+	default:
+		// Free list full, just carry on.
+	}
+	return
 }

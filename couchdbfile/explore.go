@@ -5,6 +5,7 @@ import (
 
 	"github.com/pipedrive/uncouch/couchbytes"
 	"github.com/pipedrive/uncouch/erldeser"
+	"github.com/pipedrive/uncouch/leakybucket"
 )
 
 // Explore is development routine to try out approaches
@@ -31,11 +32,13 @@ func (cf *CouchDbFile) Explore() error {
 				slog.Debugf("%v", string(kvNode.Documents[i].ID))
 				for _, rev := range kvNode.Documents[i].Revisions {
 					if rev.Offset > 0 {
-						docBytes, err := couchbytes.ReadDocument(cf.input, rev.Offset)
+						docBytes, err := couchbytes.ReadDocumentBytes(cf.input, rev.Offset)
 						if err != nil {
 							slog.Error(err)
 							return err
 						}
+						defer leakybucket.PutBytes(docBytes)
+
 						/*
 							docReader := *bytes.NewReader(*docBytes)
 							s, err := erldeser.New(&docReader)

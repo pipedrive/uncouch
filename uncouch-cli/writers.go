@@ -1,9 +1,8 @@
 package main
 
 import (
-	"bytes"
-
 	"github.com/pipedrive/uncouch/couchdbfile"
+	"github.com/pipedrive/uncouch/leakybucket"
 )
 
 func writeData(cf *couchdbfile.CouchDbFile) error {
@@ -29,15 +28,16 @@ func processIDNode(cf *couchdbfile.CouchDbFile, offset int64) error {
 			}
 			return nil
 		} else if kvNode != nil {
-			var output bytes.Buffer
+			output := leakybucket.GetBuffer()
 			for _, document := range kvNode.Documents {
-				err = cf.WriteDocument(&document, &output)
+				err = cf.WriteDocument(&document, output)
 				if err != nil {
 					slog.Error(err)
 					return err
 				}
 			}
 			// fmt.Print(output.String())
+			leakybucket.PutBuffer(output)
 			return nil
 		}
 	}
@@ -61,15 +61,16 @@ func processSeqNode(cf *couchdbfile.CouchDbFile, offset int64) error {
 			}
 			return nil
 		} else if kvNode != nil {
-			var output bytes.Buffer
+			output := leakybucket.GetBuffer()
 			for _, document := range kvNode.Documents {
-				err = cf.WriteDocument(&document, &output)
+				err = cf.WriteDocument(&document, output)
 				if err != nil {
 					slog.Error(err)
 					return err
 				}
 			}
 			// fmt.Print(output.String())
+			leakybucket.PutBuffer(output)
 			return nil
 		}
 	}

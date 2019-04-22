@@ -12,12 +12,12 @@ import (
 // ReadIDNode reads node from data file
 func (cf *CouchDbFile) ReadIDNode(offset int64) (*KpNodeID, *KvNode, error) {
 	// slog.Debugf("Starting readNode with offset %d", offset)
-	buf, err := couchbytes.ReadNode(cf.input, offset)
+	buf, err := couchbytes.ReadNodeBytes(cf.input, offset)
 	if err != nil {
 		slog.Error(err)
 		return nil, nil, err
 	}
-	defer leakybucket.Put(buf)
+	defer leakybucket.PutBytes(buf)
 	s, err := erldeser.New(*buf)
 	if err != nil {
 		slog.Error(err)
@@ -56,12 +56,12 @@ func (cf *CouchDbFile) ReadIDNode(offset int64) (*KpNodeID, *KvNode, error) {
 // ReadSeqNode reads node from data file
 func (cf *CouchDbFile) ReadSeqNode(offset int64) (*KpNodeSeq, *KvNode, error) {
 	// slog.Debugf("Starting readNode with offset %d", offset)
-	buf, err := couchbytes.ReadNode(cf.input, offset)
+	buf, err := couchbytes.ReadNodeBytes(cf.input, offset)
 	if err != nil {
 		slog.Error(err)
 		return nil, nil, err
 	}
-	defer leakybucket.Put(buf)
+	defer leakybucket.PutBytes(buf)
 	s, err := erldeser.New(*buf)
 	if err != nil {
 		slog.Error(err)
@@ -104,12 +104,12 @@ func (cf *CouchDbFile) ReadDbHeader() (*DbHeader, error) {
 		slog.Error(err)
 		return nil, err
 	}
-	buf, err := couchbytes.ReadDbHeader(cf.input, offset)
+	buf, err := couchbytes.ReadDbHeaderBytes(cf.input, offset)
 	if err != nil {
 		slog.Error(err)
 		return nil, err
 	}
-	defer leakybucket.Put(buf)
+	defer leakybucket.PutBytes(buf)
 	s, err := erldeser.New(*buf)
 	if err != nil {
 		slog.Error(err)

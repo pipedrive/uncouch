@@ -20,8 +20,8 @@ const (
 	deflateSuffix  = 80
 )
 
-// ReadDbHeader reads byte buffer containing serialised DB header element
-func ReadDbHeader(input io.ReadSeeker, offset int64) (*[]byte, error) {
+// ReadDbHeaderBytes reads byte buffer containing serialised DB header element
+func ReadDbHeaderBytes(input io.ReadSeeker, offset int64) (*[]byte, error) {
 	dataSize, bytesSkipped, err := readUint32Skip4K(input, offset)
 	if err != nil {
 		slog.Error(err)
@@ -49,8 +49,8 @@ func ReadDbHeader(input io.ReadSeeker, offset int64) (*[]byte, error) {
 	return &t, nil
 }
 
-// ReadNode reads byte buffer containing serialised Node element
-func ReadNode(input io.ReadSeeker, offset int64) (*[]byte, error) {
+// ReadNodeBytes reads byte buffer containing serialised Node element
+func ReadNodeBytes(input io.ReadSeeker, offset int64) (*[]byte, error) {
 	dataSize, bytesSkipped, err := readUint32Skip4K(input, offset)
 	if err != nil {
 		slog.Error(err)
@@ -64,8 +64,8 @@ func ReadNode(input io.ReadSeeker, offset int64) (*[]byte, error) {
 	return uncompressBuffer(buf)
 }
 
-// ReadDocument reads the actual stored document and returns respective buffer
-func ReadDocument(input io.ReadSeeker, offset int64) (*[]byte, error) {
+// ReadDocumentBytes reads the actual stored document and returns respective buffer
+func ReadDocumentBytes(input io.ReadSeeker, offset int64) (*[]byte, error) {
 	combinedSize, bytesSkipped, err := readUint32Skip4K(input, offset)
 	if err != nil {
 		slog.Error(err)
@@ -84,18 +84,12 @@ func ReadDocument(input io.ReadSeeker, offset int64) (*[]byte, error) {
 		slog.Error(err)
 		return nil, err
 	}
-	bufReader := *bytes.NewReader(*buf)
 	/*
 		md5Hash := (*buf)[:16]
 		slog.Debug(hex.EncodeToString(md5Hash))
 	*/
-	bufReader.Seek(20, io.SeekStart)
-	var docSize uint32
-	err = binary.Read(&bufReader, binary.BigEndian, &docSize)
-	if err != nil {
-		slog.Error(err)
-		return nil, err
-	}
+	docSize := binary.BigEndian.Uint32((*buf)[20:24])
+
 	docSlice := (*buf)[24 : docSize+24]
 	docBytes, err := uncompressBuffer(&docSlice)
 	if err != nil {
@@ -107,17 +101,11 @@ func ReadDocument(input io.ReadSeeker, offset int64) (*[]byte, error) {
 
 // uncompressBuffer uncompresses buffer if needed
 func uncompressBuffer(buf *[]byte) (*[]byte, error) {
-	bufReader := *bytes.NewReader(*buf)
-	var b uint8
-	err := binary.Read(&bufReader, binary.BigEndian, &b)
-	if err != nil {
-		slog.Error(err)
-		return nil, err
-	}
+	b := uint8((*buf)[0])
 	switch b {
 	case snappyPrefix:
 		// slog.Debug("Snappy compressed node")
-		destBuf := leakybucket.Get(int32(len(*buf) * 5))
+		destBuf := leakybucket.GetBytes(int32(len(*buf) * 5))
 		// Uncompress and go
 		res, err := snappy.Decode(*destBuf, (*buf)[1:])
 		if err != nil {
@@ -125,16 +113,12 @@ func uncompressBuffer(buf *[]byte) (*[]byte, error) {
 			return nil, err
 		}
 		// Release compressed buffer
-		leakybucket.Put(buf)
+		leakybucket.PutBytes(buf)
 		// Skip the Magic Marker
 		res = res[1:]
 		return &res, nil
 	case magicNumber:
-		err = binary.Read(&bufReader, binary.BigEndian, &b)
-		if err != nil {
-			slog.Error(err)
-			return nil, err
-		}
+		b := uint8((*buf)[1])
 		if b == deflateSuffix {
 			slog.Debug("Deflate compressed node")
 			err := fmt.Errorf("Deflate un-compression is not implemented yet")
@@ -158,6 +142,7 @@ func readUint32Skip4K(input io.ReadSeeker, offset int64) (uint32, int64, error) 
 		slog.Error(err)
 		return 0, 0, err
 	}
+	defer leakybucket.PutBytes(buf)
 	bufReader := *bytes.NewReader(*buf)
 	var result uint32
 	err = binary.Read(&bufReader, binary.BigEndian, &result)
@@ -188,7 +173,7 @@ func readAndSkip4K(input io.ReadSeeker, offset int64, dataSize uint32) (*[]byte,
 	upperBound := (offset + int64(dataSize)) / int64(BlockAlignment)
 
 	// Read into byte array
-	buf := leakybucket.Get(int32(dataSize) + int32(upperBound-lowerBound))
+	buf := leakybucket.GetBytes(int32(dataSize) + int32(upperBound-lowerBound))
 	_, err = input.Read(*buf)
 	if err != nil {
 		if err != io.EOF {
