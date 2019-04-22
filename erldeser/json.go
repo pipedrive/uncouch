@@ -3,6 +3,7 @@ package erldeser
 import (
 	"bytes"
 	"fmt"
+	"strconv"
 )
 
 // WriteJSONToBuffer writes Erlang serialised JSON to given buffer
@@ -85,25 +86,25 @@ func (s *Scanner) readJSONValue(collector *bytes.Buffer) error {
 	}
 	switch t.Term {
 	case NewFloatExt:
-		_, err = collector.WriteString(fmt.Sprintf("%v", t.FloatValue))
+		_, err = collector.WriteString(strconv.FormatFloat(t.FloatValue, 'g', -1, 64))
 		if err != nil {
 			slog.Error(err)
 			return err
 		}
 	case SmallIntegerExt:
-		_, err = collector.WriteString(fmt.Sprintf("%v", t.IntegerValue))
+		_, err = collector.WriteString(strconv.FormatInt(int64(t.IntegerValue), 10))
 		if err != nil {
 			slog.Error(err)
 			return err
 		}
 	case IntegerExt:
-		_, err = collector.WriteString(fmt.Sprintf("%v", t.IntegerValue))
+		_, err = collector.WriteString(strconv.FormatInt(int64(t.IntegerValue), 10))
 		if err != nil {
 			slog.Error(err)
 			return err
 		}
 	case AtomExt:
-		_, err = collector.WriteString(fmt.Sprintf("%v", t.StringValue))
+		_, err = collector.WriteString(t.StringValue)
 		if err != nil {
 			slog.Error(err)
 			return err
@@ -162,7 +163,7 @@ func (s *Scanner) readJSONValue(collector *bytes.Buffer) error {
 		}
 		l := len(t.Binary)
 		for i := 0; i < l; i++ {
-			_, err = collector.WriteString(fmt.Sprintf("%d", t.Binary[i]))
+			_, err = collector.WriteString(strconv.FormatInt(int64(t.Binary[i]), 10))
 			if err != nil {
 				slog.Error(err)
 				return err
@@ -216,11 +217,22 @@ func (s *Scanner) readJSONValue(collector *bytes.Buffer) error {
 			return err
 		}
 	case BinaryExt:
-		_, err = collector.WriteString(fmt.Sprintf("\"%s\"", string(t.Binary)))
+		_, err = collector.WriteString("\"")
 		if err != nil {
 			slog.Error(err)
 			return err
 		}
+		_, err = collector.WriteString(string(t.Binary))
+		if err != nil {
+			slog.Error(err)
+			return err
+		}
+		_, err = collector.WriteString("\"")
+		if err != nil {
+			slog.Error(err)
+			return err
+		}
+
 	default:
 		err = fmt.Errorf("Don't know how to turn type %v into JSON value", t.Term)
 		slog.Error(err)
