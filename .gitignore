@@ -1,3 +1,4 @@
+.DS_Store
 # Ignore dev binary
 uncouch
 # Binaries for programs and plugins

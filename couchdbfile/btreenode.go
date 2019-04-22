@@ -2,19 +2,33 @@ package couchdbfile
 
 import "github.com/pipedrive/uncouch/erldeser"
 
-// KpNode is a subset of data in CouchDB Btree nodes we need for data extraction
-type KpNode struct {
+// KpNodeID is a subset of data in CouchDB Btree nodes we need for data extraction
+type KpNodeID struct {
 	Length   int32
-	Pointers []Pointer
+	Pointers []PointerID
 }
 
-// Pointer is a subset of data in CouchDB Btree nodes we need for data extraction
-type Pointer struct {
+// PointerID is a subset of data in CouchDB Btree nodes we need for data extraction
+type PointerID struct {
 	Key    []byte
 	Offset int64
 	Count  int64
 	Count2 int64
 	Size   int32
+}
+
+// KpNodeSeq is a subset of data in CouchDB Btree nodes we need for data extraction
+type KpNodeSeq struct {
+	Length   int32
+	Pointers []PointerSeq
+}
+
+// PointerSeq is a subset of data in CouchDB Btree nodes we need for data extraction
+type PointerSeq struct {
+	Seq    int64
+	Offset int64
+	Size1  int64
+	Size2  int64
 }
 
 // KvNode is a subset of data in CouchDB Btree nodes we need for data extraction
@@ -44,18 +58,36 @@ type Revision struct {
 }
 
 // readFromTermite reads node structure out of erldeser.Termite structure
-func (n *KpNode) readFromTermite(t *erldeser.Termite) error {
+func (n *KpNodeID) readFromTermite(t *erldeser.Termite) error {
 	n.Length = int32(t.Children[1].T.IntegerValue)
-	n.Pointers = make([]Pointer, n.Length)
+	n.Pointers = make([]PointerID, n.Length)
 
 	for i := int32(0); i < n.Length; i++ {
 		t1 := t.Children[1].Children[i]
+		// slog.Debug(t)
 		n.Pointers[i].Key = t1.Children[0].T.Binary
 		t2 := t1.Children[1]
 		n.Pointers[i].Offset = t2.Children[0].T.IntegerValue
 		n.Pointers[i].Count = t2.Children[1].Children[0].T.IntegerValue
 		n.Pointers[i].Count2 = t2.Children[1].Children[1].T.IntegerValue
 		n.Pointers[i].Size = int32(t2.Children[2].T.IntegerValue)
+	}
+	return nil
+}
+
+// readFromTermite reads node structure out of erldeser.Termite structure
+func (n *KpNodeSeq) readFromTermite(t *erldeser.Termite) error {
+	n.Length = int32(t.Children[1].T.IntegerValue)
+	n.Pointers = make([]PointerSeq, n.Length)
+
+	for i := int32(0); i < n.Length; i++ {
+		t1 := t.Children[1].Children[i]
+		// slog.Debug(t)
+		n.Pointers[i].Seq = t1.Children[0].T.IntegerValue
+		t2 := t1.Children[1]
+		n.Pointers[i].Offset = t2.Children[0].T.IntegerValue
+		n.Pointers[i].Size1 = t2.Children[1].T.IntegerValue
+		n.Pointers[i].Size2 = t2.Children[2].T.IntegerValue
 	}
 	return nil
 }

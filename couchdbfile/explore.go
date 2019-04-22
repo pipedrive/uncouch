@@ -14,7 +14,7 @@ func (cf *CouchDbFile) Explore() error {
 	var counter int64
 	nextOffset := cf.Header.IDTreeState.Offset
 	for {
-		kpNode, kvNode, err := cf.ReadNode(nextOffset)
+		kpNode, kvNode, err := cf.ReadIDNode(nextOffset)
 		if err != nil {
 			slog.Error(err)
 			return err

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"io/ioutil"
 	"os"
 	"runtime"
 
@@ -21,7 +23,13 @@ func cmdDataFunc(cmd *cobra.Command, args []string) error {
 		slog.Error(err)
 		return err
 	}
-	cf, err := couchdbfile.New(f, fi.Size())
+	fileBytes, err := ioutil.ReadAll(f)
+	if err != nil {
+		slog.Error(err)
+		return err
+	}
+	memoryReader := bytes.NewReader(fileBytes)
+	cf, err := couchdbfile.New(memoryReader, fi.Size())
 	if err != nil {
 		slog.Error(err)
 		return err
