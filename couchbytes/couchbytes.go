@@ -120,12 +120,12 @@ func uncompressBuffer(buf *[]byte) (*[]byte, error) {
 	case magicNumber:
 		b := uint8((*buf)[1])
 		if b == deflateSuffix {
-			slog.Debug("Deflate compressed node")
+			// slog.Debug("Deflate compressed node")
 			err := fmt.Errorf("Deflate un-compression is not implemented yet")
 			slog.Error(err)
 			return nil, err
 		}
-		slog.Debug("Uncompressed node")
+		// slog.Debug("Uncompressed node")
 		t := (*buf)[1:]
 		return &t, nil
 	default:

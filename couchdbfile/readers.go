@@ -29,7 +29,7 @@ func (cf *CouchDbFile) ReadIDNode(offset int64) (*KpNodeID, *KvNode, error) {
 		return nil, nil, err
 	}
 	// Switch
-	switch t.Children[0].T.StringValue {
+	switch string(t.Children[0].T.Binary) {
 	case "kp_node":
 		var kpNode KpNodeID
 		err = kpNode.readFromTermite(t)
@@ -37,6 +37,7 @@ func (cf *CouchDbFile) ReadIDNode(offset int64) (*KpNodeID, *KvNode, error) {
 			slog.Error(err)
 			return nil, nil, err
 		}
+		t.Release()
 		return &kpNode, nil, nil
 	case "kv_node":
 		var kvNode KvNode
@@ -45,9 +46,10 @@ func (cf *CouchDbFile) ReadIDNode(offset int64) (*KpNodeID, *KvNode, error) {
 			slog.Error(err)
 			return nil, nil, err
 		}
+		t.Release()
 		return nil, &kvNode, nil
 	default:
-		err := fmt.Errorf("Unknown node type: %v", t.Children[0].T.StringValue)
+		err := fmt.Errorf("Unknown node type: %v", string(t.Children[0].T.Binary))
 		slog.Error(err)
 		return nil, nil, err
 	}
@@ -73,7 +75,7 @@ func (cf *CouchDbFile) ReadSeqNode(offset int64) (*KpNodeSeq, *KvNode, error) {
 		return nil, nil, err
 	}
 	// Switch
-	switch t.Children[0].T.StringValue {
+	switch string(t.Children[0].T.Binary) {
 	case "kp_node":
 		var kpNode KpNodeSeq
 		err = kpNode.readFromTermite(t)
@@ -81,6 +83,7 @@ func (cf *CouchDbFile) ReadSeqNode(offset int64) (*KpNodeSeq, *KvNode, error) {
 			slog.Error(err)
 			return nil, nil, err
 		}
+		t.Release()
 		return &kpNode, nil, nil
 	case "kv_node":
 		var kvNode KvNode
@@ -89,9 +92,10 @@ func (cf *CouchDbFile) ReadSeqNode(offset int64) (*KpNodeSeq, *KvNode, error) {
 			slog.Error(err)
 			return nil, nil, err
 		}
+		t.Release()
 		return nil, &kvNode, nil
 	default:
-		err := fmt.Errorf("Unknown node type: %v", t.Children[0].T.StringValue)
+		err := fmt.Errorf("Unknown node type: %v", string(t.Children[0].T.Binary))
 		slog.Error(err)
 		return nil, nil, err
 	}
@@ -120,7 +124,9 @@ func (cf *CouchDbFile) ReadDbHeader() (*DbHeader, error) {
 		slog.Error(err)
 		return nil, err
 	}
+	// slog.Debugf("%+v", t)
 	var header DbHeader
 	header.readFromTermite(t)
+	t.Release()
 	return &header, nil
 }

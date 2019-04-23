@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/pipedrive/uncouch/couchdbfile"
 	"github.com/pipedrive/uncouch/leakybucket"
 )
@@ -36,7 +38,7 @@ func processIDNode(cf *couchdbfile.CouchDbFile, offset int64) error {
 					return err
 				}
 			}
-			// fmt.Print(output.String())
+			fmt.Print(output.String())
 			leakybucket.PutBuffer(output)
 			return nil
 		}
@@ -69,7 +71,7 @@ func processSeqNode(cf *couchdbfile.CouchDbFile, offset int64) error {
 					return err
 				}
 			}
-			// fmt.Print(output.String())
+			fmt.Print(output.String())
 			leakybucket.PutBuffer(output)
 			return nil
 		}

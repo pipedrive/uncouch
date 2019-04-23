@@ -62,8 +62,8 @@ func (dbh *DbHeader) findHeader(input io.ReadSeeker, size int64) (offset int64, 
 
 // readFromTermite reads header structure out of Termite structure
 func (dbh *DbHeader) readFromTermite(t *erldeser.Termite) error {
-	if t.Children[0].T.StringValue != "db_header" {
-		err := fmt.Errorf("Term header is \"%s\". Expecting \"db_header\"", t.Children[0].T.StringValue)
+	if string(t.Children[0].T.Binary) != "db_header" {
+		err := fmt.Errorf("Term header is \"%s\". Expecting \"db_header\"", string(t.Children[0].T.Binary))
 		slog.Error(err)
 		return err
 	}

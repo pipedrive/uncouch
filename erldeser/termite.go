@@ -4,6 +4,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
+
+	"github.com/pipedrive/uncouch/erlterm"
+	"github.com/pipedrive/uncouch/leakybucket"
 )
 
 // Termite is structure to hold recursive de-serialise Erlang term
@@ -12,7 +15,7 @@ import (
 // a foolish thing to indulge in - particularly if it is the case that in
 // bantering lies the key to human warmth.
 type Termite struct {
-	T        Term
+	T        erlterm.Term
 	Children []*Termite
 }
 
@@ -29,11 +32,10 @@ func (s *Scanner) ReadTermite() (*Termite, error) {
 
 // buildTermite is recursive functiuon building Termite structure
 func (s *Scanner) buildTermite(buildNode *Termite) error {
-	t, err := s.Scan()
-	if err != nil {
-		slog.Error(err)
-		return err
-	}
+	t := leakybucket.GetTerm()
+	// defer leakybucket.PutTerm(t)
+	// Not sure we can release the term here, probably not
+	s.Scan(t)
 	buildNode.T = *t
 	switch t.Term {
 	case NewFloatExt:
@@ -50,7 +52,7 @@ func (s *Scanner) buildTermite(buildNode *Termite) error {
 			termite := new(Termite)
 			temp := append(buildNode.Children, termite)
 			buildNode.Children = temp
-			err = s.buildTermite(termite)
+			err := s.buildTermite(termite)
 			if err != nil {
 				slog.Error(err)
 				return err
@@ -63,14 +65,14 @@ func (s *Scanner) buildTermite(buildNode *Termite) error {
 			termite := new(Termite)
 			temp := append(buildNode.Children, termite)
 			buildNode.Children = temp
-			err = s.buildTermite(termite)
+			err := s.buildTermite(termite)
 			if err != nil {
 				slog.Error(err)
 				return err
 			}
 		}
 	default:
-		err = fmt.Errorf("Unhandled term type %v", t.Term)
+		err := fmt.Errorf("Unhandled term type %v", t.Term)
 		slog.Error(err)
 		return err
 	}
@@ -100,7 +102,7 @@ func formatTermite(t *Termite, output *strings.Builder, nestedLevel int) {
 	case IntegerExt:
 		output.WriteString(fmt.Sprintf("%s Int: %v\n", pad, t.T.IntegerValue))
 	case AtomExt:
-		output.WriteString(fmt.Sprintf("%s Atom: %v\n", pad, t.T.StringValue))
+		output.WriteString(fmt.Sprintf("%s Atom: %v\n", pad, string(t.T.Binary)))
 	case SmallTupleExt:
 		output.WriteString(fmt.Sprintf("%s Small tuple with count: %v\n", pad, t.T.IntegerValue))
 		for i := int64(0); i < t.T.IntegerValue; i++ {
@@ -122,4 +124,40 @@ func formatTermite(t *Termite, output *strings.Builder, nestedLevel int) {
 	default:
 		output.WriteString(fmt.Sprintf("%s String can not handle %v \n", pad, t.T.Term))
 	}
+}
+
+// Release releases used Terms back for reuse
+func (t *Termite) Release() {
+	releaseTermite(t)
+	return
+}
+
+func releaseTermite(t *Termite) {
+	switch t.T.Term {
+	case NewFloatExt:
+		leakybucket.PutTerm(&t.T)
+	case SmallIntegerExt:
+		leakybucket.PutTerm(&t.T)
+	case IntegerExt:
+		leakybucket.PutTerm(&t.T)
+	case AtomExt:
+		leakybucket.PutTerm(&t.T)
+	case SmallTupleExt:
+		for i := int64(0); i < t.T.IntegerValue; i++ {
+			releaseTermite(t.Children[i])
+		}
+	case NilExt:
+		leakybucket.PutTerm(&t.T)
+	case StringExt:
+		leakybucket.PutTerm(&t.T)
+	case ListExt:
+		for i := int64(0); i <= t.T.IntegerValue; i++ {
+			releaseTermite(t.Children[i])
+		}
+	case BinaryExt:
+		leakybucket.PutTerm(&t.T)
+	default:
+		slog.Errorf("Unhandled Term type in releaseTermite %v", t.T.Term)
+	}
+	return
 }

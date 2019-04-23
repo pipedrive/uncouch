@@ -6,32 +6,22 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+
+	"github.com/pipedrive/uncouch/erlterm"
 )
-
-// TermType is Erlanf data type tag used in serialisation
-type TermType byte
-
-// Term is structure to hold de-serialise Erlang term
-type Term struct {
-	Term         TermType
-	IntegerValue int64
-	StringValue  string
-	FloatValue   float64
-	Binary       []byte
-}
 
 // Actual values for different data types
 const (
-	NewFloatExt     TermType = 'F'
-	SmallIntegerExt TermType = 'a'
-	IntegerExt      TermType = 'b'
-	AtomExt         TermType = 'd'
-	SmallTupleExt   TermType = 'h'
-	LargeTupleExt   TermType = 'i'
-	NilExt          TermType = 'j'
-	StringExt       TermType = 'k'
-	ListExt         TermType = 'l'
-	BinaryExt       TermType = 'm'
+	NewFloatExt     erlterm.TermType = 'F'
+	SmallIntegerExt erlterm.TermType = 'a'
+	IntegerExt      erlterm.TermType = 'b'
+	AtomExt         erlterm.TermType = 'd'
+	SmallTupleExt   erlterm.TermType = 'h'
+	LargeTupleExt   erlterm.TermType = 'i'
+	NilExt          erlterm.TermType = 'j'
+	StringExt       erlterm.TermType = 'k'
+	ListExt         erlterm.TermType = 'l'
+	BinaryExt       erlterm.TermType = 'm'
 )
 
 // Scanner implements term scanner from provided io.Reader
@@ -51,28 +41,42 @@ func New(input []byte) (cf *Scanner, err error) {
 }
 
 // Scan scans provided input and return deserialised Erlang term
-func (s *Scanner) Scan() (*Term, error) {
-	termType := TermType(s.input[s.offset])
+func (s *Scanner) Scan(reusableTerm *erlterm.Term) (*erlterm.Term, error) {
+	if reusableTerm == nil {
+		reusableTerm = new(erlterm.Term)
+	} else {
+		// reset the term
+	}
+	termType := erlterm.TermType(s.input[s.offset])
 	s.offset++
 	switch termType {
 	case NewFloatExt:
-		return s.readNewFloat()
+		s.readNewFloat(reusableTerm)
+		return reusableTerm, nil
 	case SmallIntegerExt:
-		return s.readSmallInteger()
+		s.readSmallInteger(reusableTerm)
+		return reusableTerm, nil
 	case IntegerExt:
-		return s.readInteger()
+		s.readInteger(reusableTerm)
+		return reusableTerm, nil
 	case AtomExt:
-		return s.readAtom()
+		s.readAtom(reusableTerm)
+		return reusableTerm, nil
 	case SmallTupleExt:
-		return s.readSmallTuple()
+		s.readSmallTuple(reusableTerm)
+		return reusableTerm, nil
 	case NilExt:
-		return s.readNil()
+		s.readNil(reusableTerm)
+		return reusableTerm, nil
 	case StringExt:
-		return s.readString()
+		s.readString(reusableTerm)
+		return reusableTerm, nil
 	case ListExt:
-		return s.readList()
+		s.readList(reusableTerm)
+		return reusableTerm, nil
 	case BinaryExt:
-		return s.readBinary()
+		s.readBinary(reusableTerm)
+		return reusableTerm, nil
 	default:
 		err := fmt.Errorf("Unhandled term type %v", termType)
 		return nil, err
@@ -80,103 +84,103 @@ func (s *Scanner) Scan() (*Term, error) {
 }
 
 // readNewFloat is reading serialised Erlang small integer
-func (s *Scanner) readNewFloat() (*Term, error) {
+func (s *Scanner) readNewFloat(t *erlterm.Term) {
 	bits := binary.LittleEndian.Uint64(s.input[s.offset : s.offset+8])
 	s.offset += 8
 	floatValue := math.Float64frombits(bits)
-	var t Term
 	t.Term = NewFloatExt
 	t.FloatValue = floatValue
-	return &t, nil
+	return
 }
 
 // readSmallInteger is reading serialised Erlang small integer
-func (s *Scanner) readSmallInteger() (*Term, error) {
+func (s *Scanner) readSmallInteger(t *erlterm.Term) {
 	intValue := int64(s.input[s.offset])
 	s.offset++
-	var t Term
 	t.Term = SmallIntegerExt
 	t.IntegerValue = intValue
-	return &t, nil
+	return
 }
 
 // readInteger is reading serialised Erlang integer
-func (s *Scanner) readInteger() (*Term, error) {
+func (s *Scanner) readInteger(t *erlterm.Term) {
 	intValue := binary.BigEndian.Uint32(s.input[s.offset : s.offset+4])
 	s.offset += 4
-	var t Term
 	t.Term = IntegerExt
 	t.IntegerValue = int64(intValue)
-	return &t, nil
+	return
 }
 
 // readAtom is reading serialised Erlang atom
-func (s *Scanner) readAtom() (*Term, error) {
+func (s *Scanner) readAtom(t *erlterm.Term) {
+	t.Term = AtomExt
 	atomLength := int64(binary.BigEndian.Uint16(s.input[s.offset : s.offset+2]))
 	s.offset += 2
-	atomName := make([]byte, atomLength)
-	copy(atomName, s.input[s.offset:s.offset+atomLength])
+	if atomLength > int64(cap(t.Binary)) {
+		t.Binary = make([]byte, atomLength)
+	} else {
+		t.Binary = t.Binary[:atomLength]
+	}
+	copy(t.Binary, s.input[s.offset:s.offset+atomLength])
 	s.offset += atomLength
-	var t Term
-	t.Term = AtomExt
-	t.StringValue = string(atomName)
-	return &t, nil
+	return
 }
 
 // readSmallTuple is reading serialised Erlang small tuple
-func (s *Scanner) readSmallTuple() (*Term, error) {
+func (s *Scanner) readSmallTuple(t *erlterm.Term) {
 	arity := int64(s.input[s.offset])
 	s.offset++
-	var t Term
 	t.Term = SmallTupleExt
 	t.IntegerValue = arity
-	return &t, nil
+	return
 }
 
 // readNil is reading serialised Erlang empty list
-func (s *Scanner) readNil() (*Term, error) {
-	var t Term
+func (s *Scanner) readNil(t *erlterm.Term) {
 	t.Term = NilExt
-	return &t, nil
+	return
 }
 
 // readString is reading serialised Erlang string
-func (s *Scanner) readString() (*Term, error) {
-	stringLength := int64(binary.BigEndian.Uint32(s.input[s.offset : s.offset+2]))
+func (s *Scanner) readString(t *erlterm.Term) {
+	t.Term = StringExt
+	stringLength := int64(binary.BigEndian.Uint16(s.input[s.offset : s.offset+2]))
 	s.offset += 2
 
-	stringBytes := make([]byte, stringLength)
-	copy(stringBytes, s.input[s.offset:s.offset+stringLength])
-	s.offset += stringLength
+	if stringLength > int64(cap(t.Binary)) {
+		t.Binary = make([]byte, stringLength)
+	} else {
+		t.Binary = t.Binary[:stringLength]
+	}
 
-	var t Term
-	t.Term = StringExt
-	t.Binary = stringBytes
-	return &t, nil
+	copy(t.Binary, s.input[s.offset:s.offset+stringLength])
+	s.offset += stringLength
+	return
 }
 
 // readList is reading serialised Erlang list
-func (s *Scanner) readList() (*Term, error) {
+func (s *Scanner) readList(t *erlterm.Term) {
 	listLength := int64(binary.BigEndian.Uint32(s.input[s.offset : s.offset+4]))
 	s.offset += 4
 
-	var t Term
 	t.Term = ListExt
 	t.IntegerValue = listLength
-	return &t, nil
+	return
 }
 
 // readBinary is reading serialised Erlang binary
-func (s *Scanner) readBinary() (*Term, error) {
+func (s *Scanner) readBinary(t *erlterm.Term) {
+	t.Term = BinaryExt
 	binaryLength := int64(binary.BigEndian.Uint32(s.input[s.offset : s.offset+4]))
 	s.offset += 4
 
-	binaryBytes := make([]byte, binaryLength)
-	copy(binaryBytes, s.input[s.offset:s.offset+binaryLength])
-	s.offset += binaryLength
+	if binaryLength > int64(cap(t.Binary)) {
+		t.Binary = make([]byte, binaryLength)
+	} else {
+		t.Binary = t.Binary[:binaryLength]
+	}
 
-	var t Term
-	t.Term = BinaryExt
-	t.Binary = binaryBytes
-	return &t, nil
+	copy(t.Binary, s.input[s.offset:s.offset+binaryLength])
+	s.offset += binaryLength
+	return
 }

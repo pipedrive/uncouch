@@ -65,7 +65,7 @@ func (n *KpNodeID) readFromTermite(t *erldeser.Termite) error {
 	for i := int32(0); i < n.Length; i++ {
 		t1 := t.Children[1].Children[i]
 		// slog.Debug(t)
-		n.Pointers[i].Key = t1.Children[0].T.Binary
+		n.Pointers[i].Key = append([]byte(nil), t1.Children[0].T.Binary...)
 		t2 := t1.Children[1]
 		n.Pointers[i].Offset = t2.Children[0].T.IntegerValue
 		n.Pointers[i].Count = t2.Children[1].Children[0].T.IntegerValue
@@ -99,7 +99,7 @@ func (n *KvNode) readFromTermite(t *erldeser.Termite) error {
 
 	for i := int32(0); i < n.Length; i++ {
 		t1 := t.Children[1].Children[i]
-		n.Documents[i].ID = t1.Children[0].T.Binary
+		n.Documents[i].ID = append([]byte(nil), t1.Children[0].T.Binary...)
 		n.Documents[i].UpdateSeq = t1.Children[1].Children[0].T.IntegerValue
 		n.Documents[i].Deleted = int8(t1.Children[1].Children[1].T.IntegerValue)
 		n.Documents[i].Size1 = int32(t1.Children[1].Children[2].Children[0].T.IntegerValue)
@@ -110,7 +110,7 @@ func (n *KvNode) readFromTermite(t *erldeser.Termite) error {
 		// Branching?
 		for {
 			r := new(Revision)
-			r.RevID = revNode.Children[0].T.Binary
+			r.RevID = append([]byte(nil), revNode.Children[0].T.Binary...)
 			if revNode.Children[1].T.Term == erldeser.NilExt {
 				r.Offset = -1
 			} else {
