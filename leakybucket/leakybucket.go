@@ -11,7 +11,7 @@ import (
 var (
 	freeByteList   = make(chan *[]byte, 50)
 	freeBufferList = make(chan *bytes.Buffer, 50)
-	freeTermList   = make(chan *erlterm.Term, 1000)
+	freeTermList   = make(chan *erlterm.Term, 5000)
 )
 
 // GetBytes returns byte slice with cap at least the size provided
@@ -74,8 +74,7 @@ func GetTerm() (t *erlterm.Term) {
 	case t = <-freeTermList:
 	default:
 		t = new(erlterm.Term)
-		presizedBinary := make([]byte, 0, 1024)
-		t.Binary = presizedBinary
+		t.Reset()
 	}
 	return t
 }
