@@ -31,7 +31,7 @@ type Scanner struct {
 }
 
 // New will return term scanner
-func New(input []byte) (cf *Scanner, err error) {
+func New(input []byte) (*Scanner, error) {
 	var (
 		newScanner Scanner
 	)
@@ -41,46 +41,39 @@ func New(input []byte) (cf *Scanner, err error) {
 }
 
 // Scan scans provided input and return deserialised Erlang term
-func (s *Scanner) Scan(reusableTerm *erlterm.Term) (*erlterm.Term, error) {
-	if reusableTerm == nil {
-		reusableTerm = new(erlterm.Term)
-	} else {
-		// reset the term
+func (s *Scanner) Scan(t *erlterm.Term) error {
+	if t == nil {
+		err := fmt.Errorf("Provided term is nil reference")
+		slog.Error(err)
+		return err
 	}
 	termType := erlterm.TermType(s.input[s.offset])
 	s.offset++
 	switch termType {
 	case NewFloatExt:
-		s.readNewFloat(reusableTerm)
-		return reusableTerm, nil
+		s.readNewFloat(t)
 	case SmallIntegerExt:
-		s.readSmallInteger(reusableTerm)
-		return reusableTerm, nil
+		s.readSmallInteger(t)
 	case IntegerExt:
-		s.readInteger(reusableTerm)
-		return reusableTerm, nil
+		s.readInteger(t)
 	case AtomExt:
-		s.readAtom(reusableTerm)
-		return reusableTerm, nil
+		s.readAtom(t)
 	case SmallTupleExt:
-		s.readSmallTuple(reusableTerm)
-		return reusableTerm, nil
+		s.readSmallTuple(t)
 	case NilExt:
-		s.readNil(reusableTerm)
-		return reusableTerm, nil
+		s.readNil(t)
 	case StringExt:
-		s.readString(reusableTerm)
-		return reusableTerm, nil
+		s.readString(t)
 	case ListExt:
-		s.readList(reusableTerm)
-		return reusableTerm, nil
+		s.readList(t)
 	case BinaryExt:
-		s.readBinary(reusableTerm)
-		return reusableTerm, nil
+		s.readBinary(t)
 	default:
 		err := fmt.Errorf("Unhandled term type %v", termType)
-		return nil, err
+		slog.Error(err)
+		return err
 	}
+	return nil
 }
 
 // readNewFloat is reading serialised Erlang small integer
