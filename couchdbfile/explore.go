@@ -5,6 +5,7 @@ import (
 
 	"github.com/pipedrive/uncouch/couchbytes"
 	"github.com/pipedrive/uncouch/erldeser"
+	"github.com/pipedrive/uncouch/jsonser"
 	"github.com/pipedrive/uncouch/leakybucket"
 )
 
@@ -58,8 +59,13 @@ func (cf *CouchDbFile) Explore() error {
 							slog.Error(err)
 							return err
 						}
+						js, err := jsonser.New(scanner)
+						if err != nil {
+							slog.Error(err)
+							return err
+						}
 						var buf bytes.Buffer
-						err = scanner.WriteJSONToBuffer(&buf)
+						err = js.WriteJSONToBuffer(&buf)
 						slog.Debug(buf.String())
 
 					}
