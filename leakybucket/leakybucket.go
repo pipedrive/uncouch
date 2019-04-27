@@ -4,14 +4,11 @@ package leakybucket
 
 import (
 	"bytes"
-
-	"github.com/pipedrive/uncouch/erlterm"
 )
 
 var (
 	freeByteList   = make(chan *[]byte, 50)
 	freeBufferList = make(chan *bytes.Buffer, 50)
-	freeTermList   = make(chan *erlterm.Term, 5000)
 )
 
 // GetBytes returns byte slice with cap at least the size provided
@@ -62,28 +59,6 @@ func PutBuffer(b *bytes.Buffer) {
 	select {
 	case freeBufferList <- b:
 		// Buffer on free list; nothing more to do.
-	default:
-		// Free list full, just carry on.
-	}
-	return
-}
-
-// GetTerm returns Term object, trying to reuse if possible
-func GetTerm() (t *erlterm.Term) {
-	select {
-	case t = <-freeTermList:
-	default:
-		t = new(erlterm.Term)
-		t.Reset()
-	}
-	return t
-}
-
-// PutTerm adds Term object to reuse list
-func PutTerm(t *erlterm.Term) {
-	select {
-	case freeTermList <- t:
-		// Term on free list; nothing more to do.
 	default:
 		// Free list full, just carry on.
 	}

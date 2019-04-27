@@ -7,7 +7,6 @@ import (
 
 	"github.com/pipedrive/uncouch/erldeser"
 	"github.com/pipedrive/uncouch/erlterm"
-	"github.com/pipedrive/uncouch/leakybucket"
 )
 
 // Termite is structure to hold recursive de-serialise Erlang term
@@ -16,13 +15,16 @@ import (
 // a foolish thing to indulge in - particularly if it is the case that in
 // bantering lies the key to human warmth.
 type Termite struct {
-	T        erlterm.Term
-	Children []*Termite
+	T             erlterm.Term
+	Children      []*Termite
+	usedTermPools []*[]*erlterm.Term
 }
 
 // Builder is root wrapper and buffer for building Termites fast
 type Builder struct {
-	s *erldeser.Scanner
+	s         *erldeser.Scanner
+	termPools []*[]*erlterm.Term
+	i, j      int
 }
 
 // NewBuilder will return term scanner
@@ -31,6 +33,7 @@ func NewBuilder() (*Builder, error) {
 		newBuilder Builder
 	)
 	nb := &newBuilder
+	nb.termPools = append(nb.termPools, GetTermPool())
 	return nb, nil
 }
 
@@ -44,15 +47,15 @@ func (b *Builder) ReadTermite(s *erldeser.Scanner) (*Termite, error) {
 		b.s = nil
 		return nil, err
 	}
+	rootTermite.usedTermPools = b.termPools
 	b.s = nil
+	// Add Termpool buffers to the Termite before releasing them
 	return &rootTermite, nil
 }
 
 // buildTermite is recursive functiuon building Termite structure
 func (b *Builder) buildTermite(buildNode *Termite) error {
-	t := leakybucket.GetTerm()
-	// defer leakybucket.PutTerm(t)
-	// Not sure we can release the term here, probably not
+	t := b.GetTerm()
 	b.s.Scan(t)
 	buildNode.T = *t
 	switch t.Term {
@@ -146,36 +149,8 @@ func formatTermite(t *Termite, output *strings.Builder, nestedLevel int) {
 
 // Release releases used Terms back for reuse
 func (t *Termite) Release() {
-	releaseTermite(t)
-	return
-}
-
-func releaseTermite(t *Termite) {
-	switch t.T.Term {
-	case erldeser.NewFloatExt:
-		leakybucket.PutTerm(&t.T)
-	case erldeser.SmallIntegerExt:
-		leakybucket.PutTerm(&t.T)
-	case erldeser.IntegerExt:
-		leakybucket.PutTerm(&t.T)
-	case erldeser.AtomExt:
-		leakybucket.PutTerm(&t.T)
-	case erldeser.SmallTupleExt:
-		for i := int64(0); i < t.T.IntegerValue; i++ {
-			releaseTermite(t.Children[i])
-		}
-	case erldeser.NilExt:
-		leakybucket.PutTerm(&t.T)
-	case erldeser.StringExt:
-		leakybucket.PutTerm(&t.T)
-	case erldeser.ListExt:
-		for i := int64(0); i <= t.T.IntegerValue; i++ {
-			releaseTermite(t.Children[i])
-		}
-	case erldeser.BinaryExt:
-		leakybucket.PutTerm(&t.T)
-	default:
-		slog.Errorf("Unhandled Term type in releaseTermite %v", t.T.Term)
+	for _, tp := range t.usedTermPools {
+		PutTermPool(tp)
 	}
 	return
 }
