@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/pipedrive/uncouch/leakybucket"
+	"github.com/pipedrive/uncouch/termite"
 
 	"github.com/pipedrive/uncouch/couchbytes"
 	"github.com/pipedrive/uncouch/erldeser"
@@ -18,12 +19,17 @@ func (cf *CouchDbFile) ReadIDNode(offset int64) (*KpNodeID, *KvNode, error) {
 		return nil, nil, err
 	}
 	defer leakybucket.PutBytes(buf)
-	s, err := erldeser.New(*buf)
+	s, err := erldeser.NewScanner(*buf)
 	if err != nil {
 		slog.Error(err)
 		return nil, nil, err
 	}
-	t, err := s.ReadTermite()
+	tb, err := termite.NewBuilder()
+	if err != nil {
+		slog.Error(err)
+		return nil, nil, err
+	}
+	t, err := tb.ReadTermite(s)
 	if err != nil {
 		slog.Error(err)
 		return nil, nil, err
@@ -64,12 +70,17 @@ func (cf *CouchDbFile) ReadSeqNode(offset int64) (*KpNodeSeq, *KvNode, error) {
 		return nil, nil, err
 	}
 	defer leakybucket.PutBytes(buf)
-	s, err := erldeser.New(*buf)
+	s, err := erldeser.NewScanner(*buf)
 	if err != nil {
 		slog.Error(err)
 		return nil, nil, err
 	}
-	t, err := s.ReadTermite()
+	tb, err := termite.NewBuilder()
+	if err != nil {
+		slog.Error(err)
+		return nil, nil, err
+	}
+	t, err := tb.ReadTermite(s)
 	if err != nil {
 		slog.Error(err)
 		return nil, nil, err
@@ -87,11 +98,6 @@ func (cf *CouchDbFile) ReadSeqNode(offset int64) (*KpNodeSeq, *KvNode, error) {
 		return &kpNode, nil, nil
 	case "kv_node":
 		var kvNode KvNode
-		t, err := s.ReadTermite()
-		if err != nil {
-			slog.Error(err)
-			return nil, nil, err
-		}
 		err = kvNode.readFromTermite(t)
 		if err != nil {
 			slog.Error(err)
@@ -119,12 +125,17 @@ func (cf *CouchDbFile) ReadDbHeader() (*DbHeader, error) {
 		return nil, err
 	}
 	defer leakybucket.PutBytes(buf)
-	s, err := erldeser.New(*buf)
+	s, err := erldeser.NewScanner(*buf)
 	if err != nil {
 		slog.Error(err)
 		return nil, err
 	}
-	t, err := s.ReadTermite()
+	tb, err := termite.NewBuilder()
+	if err != nil {
+		slog.Error(err)
+		return nil, err
+	}
+	t, err := tb.ReadTermite(s)
 	if err != nil {
 		slog.Error(err)
 		return nil, err

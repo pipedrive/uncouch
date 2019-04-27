@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/pipedrive/uncouch/erldeser"
-
 	"github.com/pipedrive/uncouch/couchbytes"
+	"github.com/pipedrive/uncouch/termite"
 )
 
 // TreeState is subset of data in db header we care for our purposes
@@ -61,7 +60,7 @@ func (dbh *DbHeader) findHeader(input io.ReadSeeker, size int64) (offset int64, 
 }
 
 // readFromTermite reads header structure out of Termite structure
-func (dbh *DbHeader) readFromTermite(t *erldeser.Termite) error {
+func (dbh *DbHeader) readFromTermite(t *termite.Termite) error {
 	if string(t.Children[0].T.Binary) != "db_header" {
 		err := fmt.Errorf("Term header is \"%s\". Expecting \"db_header\"", string(t.Children[0].T.Binary))
 		slog.Error(err)

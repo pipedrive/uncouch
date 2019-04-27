@@ -18,7 +18,7 @@ func (cf *CouchDbFile) WriteDocument(di *DocumentInfo, output *bytes.Buffer) err
 		return err
 	}
 	defer leakybucket.PutBytes(docBytes)
-	scanner, err := erldeser.New(*docBytes)
+	scanner, err := erldeser.NewScanner(*docBytes)
 	if err != nil {
 		slog.Error(err)
 		return err

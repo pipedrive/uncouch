@@ -31,7 +31,7 @@ type Scanner struct {
 }
 
 // New will return term scanner
-func New(input []byte) (*Scanner, error) {
+func NewScanner(input []byte) (*Scanner, error) {
 	var (
 		newScanner Scanner
 	)

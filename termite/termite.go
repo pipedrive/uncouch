@@ -25,6 +25,15 @@ type Builder struct {
 	s *erldeser.Scanner
 }
 
+// NewBuilder will return term scanner
+func NewBuilder() (*Builder, error) {
+	var (
+		newBuilder Builder
+	)
+	nb := &newBuilder
+	return nb, nil
+}
+
 // ReadTermite is reading serialised Erlang term from stream
 func (b *Builder) ReadTermite(s *erldeser.Scanner) (*Termite, error) {
 	b.s = s

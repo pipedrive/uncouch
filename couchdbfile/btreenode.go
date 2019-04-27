@@ -2,6 +2,7 @@ package couchdbfile
 
 import (
 	"github.com/pipedrive/uncouch/erldeser"
+	"github.com/pipedrive/uncouch/termite"
 )
 
 // KpNodeID is a subset of data in CouchDB Btree nodes we need for data extraction
@@ -60,7 +61,7 @@ type Revision struct {
 }
 
 // readFromTermite reads node structure out of erldeser.Termite structure
-func (n *KpNodeID) readFromTermite(t *erldeser.Termite) error {
+func (n *KpNodeID) readFromTermite(t *termite.Termite) error {
 	n.Length = int32(t.Children[1].T.IntegerValue)
 	n.Pointers = make([]PointerID, n.Length)
 
@@ -78,7 +79,7 @@ func (n *KpNodeID) readFromTermite(t *erldeser.Termite) error {
 }
 
 // readFromTermite reads node structure out of erldeser.Termite structure
-func (n *KpNodeSeq) readFromTermite(t *erldeser.Termite) error {
+func (n *KpNodeSeq) readFromTermite(t *termite.Termite) error {
 	n.Length = int32(t.Children[1].T.IntegerValue)
 	n.Pointers = make([]PointerSeq, n.Length)
 
@@ -95,7 +96,7 @@ func (n *KpNodeSeq) readFromTermite(t *erldeser.Termite) error {
 }
 
 // readFromTermite reads node structure out of erldeser.Termite structure
-func (n *KvNode) readFromTermite(t *erldeser.Termite) error {
+func (n *KvNode) readFromTermite(t *termite.Termite) error {
 	n.Length = int32(t.Children[1].T.IntegerValue)
 	n.Documents = make([]DocumentInfo, n.Length)
 

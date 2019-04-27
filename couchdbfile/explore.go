@@ -54,7 +54,7 @@ func (cf *CouchDbFile) Explore() error {
 								return err
 							}
 						*/
-						scanner, err := erldeser.New(*docBytes)
+						scanner, err := erldeser.NewScanner(*docBytes)
 						if err != nil {
 							slog.Error(err)
 							return err
