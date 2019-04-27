@@ -3,7 +3,6 @@ package couchdbfile
 import (
 	"fmt"
 
-	"github.com/pipedrive/uncouch/erlterm"
 	"github.com/pipedrive/uncouch/leakybucket"
 
 	"github.com/pipedrive/uncouch/couchbytes"
@@ -70,44 +69,16 @@ func (cf *CouchDbFile) ReadSeqNode(offset int64) (*KpNodeSeq, *KvNode, error) {
 		slog.Error(err)
 		return nil, nil, err
 	}
-	var t erlterm.Term
-	t.Reset()
-	err = s.Scan(&t)
+	t, err := s.ReadTermite()
 	if err != nil {
 		slog.Error(err)
 		return nil, nil, err
 	}
-	if t.Term != erldeser.SmallTupleExt && t.IntegerValue != 2 {
-		parsingError := fmt.Errorf("Expected SmallTuple with size 2, got %v, %v", t.Term, t.IntegerValue)
-		slog.Error(parsingError)
-		return nil, nil, parsingError
-	}
-	err = s.Scan(&t)
-	if err != nil {
-		slog.Error(err)
-		return nil, nil, err
-	}
-	if t.Term != erldeser.AtomExt {
-		parsingError := fmt.Errorf("Expected Binary, got %v", t.Term)
-		slog.Error(parsingError)
-		return nil, nil, parsingError
-	}
-	termTypeString := string(t.Binary)
-
-	/*
-		t, err := s.ReadTermite()
-		if err != nil {
-			slog.Error(err)
-			return nil, nil, err
-		}
-	*/
-	s.Rewind()
 	// Switch
-	switch string(termTypeString) {
+	switch string(t.Children[0].T.Binary) {
 	case "kp_node":
 		var kpNode KpNodeSeq
-		// err = kpNode.readFromTermite(t)
-		err = kpNode.readFromScanner(s)
+		err = kpNode.readFromTermite(t)
 		if err != nil {
 			slog.Error(err)
 			return nil, nil, err
@@ -122,15 +93,14 @@ func (cf *CouchDbFile) ReadSeqNode(offset int64) (*KpNodeSeq, *KvNode, error) {
 			return nil, nil, err
 		}
 		err = kvNode.readFromTermite(t)
-		// err = kvNode.readFromScanner(s)
 		if err != nil {
 			slog.Error(err)
 			return nil, nil, err
 		}
-		// t.Release()
+		t.Release()
 		return nil, &kvNode, nil
 	default:
-		err := fmt.Errorf("Unknown node type: %v", termTypeString)
+		err := fmt.Errorf("Unknown node type: %v", string(t.Children[0].T.Binary))
 		slog.Error(err)
 		return nil, nil, err
 	}
