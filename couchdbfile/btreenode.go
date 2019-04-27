@@ -1,6 +1,8 @@
 package couchdbfile
 
-import "github.com/pipedrive/uncouch/erldeser"
+import (
+	"github.com/pipedrive/uncouch/erldeser"
+)
 
 // KpNodeID is a subset of data in CouchDB Btree nodes we need for data extraction
 type KpNodeID struct {

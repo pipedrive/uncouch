@@ -8,8 +8,8 @@ import (
 )
 
 func writeData(cf *couchdbfile.CouchDbFile) error {
-	return processSeqNode(cf, cf.Header.SeqTreeState.Offset)
-	// return processIDNode(cf, cf.Header.IDTreeState.Offset)
+	// return processSeqNode(cf, cf.Header.SeqTreeState.Offset)
+	return processIDNode(cf, cf.Header.IDTreeState.Offset)
 }
 
 func processIDNode(cf *couchdbfile.CouchDbFile, offset int64) error {
@@ -71,7 +71,7 @@ func processSeqNode(cf *couchdbfile.CouchDbFile, offset int64) error {
 					return err
 				}
 			}
-			// fmt.Print(output.String())
+			fmt.Print(output.String())
 			leakybucket.PutBuffer(output)
 			return nil
 		}

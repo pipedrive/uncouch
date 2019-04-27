@@ -76,6 +76,11 @@ func (s *Scanner) Scan(t *erlterm.Term) error {
 	return nil
 }
 
+// Rewind resets offset to be able to scan same buffer again
+func (s *Scanner) Rewind() {
+	s.offset = 0
+}
+
 // readNewFloat is reading serialised Erlang small integer
 func (s *Scanner) readNewFloat(t *erlterm.Term) {
 	bits := binary.LittleEndian.Uint64(s.input[s.offset : s.offset+8])
