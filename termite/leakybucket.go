@@ -1,18 +1,31 @@
 package termite
 
-import "github.com/pipedrive/uncouch/erlterm"
+import (
+	"fmt"
 
-const termPoolSize = 100
+	"github.com/pipedrive/uncouch/erlterm"
+)
+
+const termPoolSize = 300
 
 var (
-	freeTermPoolList = make(chan *[]*erlterm.Term, 50)
+	freeTermPoolList                                                                       = make(chan *[]*erlterm.Term, 50)
+	putPoolSuccess, putPoolFailure, getPoolSuccess, getPoolFailure, termPoolListIncrements int64
 )
+
+// GetProfilerData emits primitive profiler data bout our pool caching
+func GetProfilerData() string {
+	return fmt.Sprintf("putPoolSuccess %v, putPoolFailure %v, getPoolSuccess %v, getPoolFailure %v, termPoolListIncrements %v",
+		putPoolSuccess, putPoolFailure, getPoolSuccess, getPoolFailure, termPoolListIncrements)
+}
 
 // GetTermPool returns reusable Term pool in the hope to reduce GC stress
 func GetTermPool() (tp *[]*erlterm.Term) {
 	select {
 	case tp = <-freeTermPoolList:
+		getPoolSuccess++
 	default:
+		getPoolFailure++
 		newPool := make([]*erlterm.Term, termPoolSize)
 		for i := range newPool {
 			newPool[i] = new(erlterm.Term)
@@ -30,8 +43,10 @@ func PutTermPool(tp *[]*erlterm.Term) {
 	}
 	select {
 	case freeTermPoolList <- tp:
+		putPoolSuccess++
 		// Term on free list; nothing more to do.
 	default:
+		putPoolFailure++
 		// Free list full, just carry on.
 	}
 	return
@@ -41,6 +56,7 @@ func PutTermPool(tp *[]*erlterm.Term) {
 func (b *Builder) GetTerm() (t *erlterm.Term) {
 	if b.j >= termPoolSize {
 		b.termPools = append(b.termPools, GetTermPool())
+		termPoolListIncrements++
 		b.i++
 		b.j = 0
 	}
