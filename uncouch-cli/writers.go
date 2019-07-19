@@ -7,7 +7,6 @@ import (
 
 	"github.com/pipedrive/uncouch/couchdbfile"
 	"github.com/pipedrive/uncouch/leakybucket"
-	"github.com/pipedrive/uncouch/termite"
 )
 
 func writeHeaders(cf *couchdbfile.CouchDbFile, outputdir string) error {
@@ -118,7 +117,7 @@ func writeData(cf *couchdbfile.CouchDbFile) error {
 
 	err := processSeqNode(cf, cf.Header.SeqTreeState.Offset)
 	// return processIDNode(cf, cf.Header.IDTreeState.Offset)
-	slog.Debug(termite.GetProfilerData())
+	// slog.Debug(termite.GetProfilerData())
 	return err
 }
 
