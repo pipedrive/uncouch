@@ -5,12 +5,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/pkg/profile"
 	"github.com/spf13/cobra"
 )
 
 func main() {
-	defer profile.Start().Stop()
+	// defer profile.Start().Stop()
 	cmdPrint := &cobra.Command{
 		Use:   "print [string to print]",
 		Short: "Print anything to the screen",
