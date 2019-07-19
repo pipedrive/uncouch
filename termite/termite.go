@@ -1,3 +1,5 @@
+// Package termite data structure to store compound Erlang terms (lists, structures)
+// in recursuved ata structure
 package termite
 
 import (
@@ -10,10 +12,6 @@ import (
 )
 
 // Termite is structure to hold recursive de-serialise Erlang term
-// Perhaps it is indeed time I began to look at this whole matter of bantering
-// more enthusiastically. After all, when one thinks about it, it is not such
-// a foolish thing to indulge in - particularly if it is the case that in
-// bantering lies the key to human warmth.
 type Termite struct {
 	T             erlterm.Term
 	Children      []*Termite
@@ -27,7 +25,7 @@ type Builder struct {
 	i, j      int
 }
 
-// NewBuilder will return term scanner
+// NewBuilder will return new Termite builder
 func NewBuilder() (*Builder, error) {
 	var (
 		newBuilder Builder
@@ -100,7 +98,7 @@ func (b *Builder) buildTermite(buildNode *Termite) error {
 	return nil
 }
 
-// String implemets Stringer for reading what's inside
+// String implemets Stringer for reading what's inside the Termite
 func (t *Termite) String() string {
 	var output strings.Builder
 	formatTermite(t, &output, 0)

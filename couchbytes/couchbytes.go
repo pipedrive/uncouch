@@ -1,5 +1,6 @@
 // Package couchbytes provides routines to read CoucDB blocks
-// into byte slices working around 4K block and compression.
+// into byte slices working around special meaning of the 4K boundry
+// and handling the uncompression of compressed data.
 package couchbytes
 
 import (
@@ -20,7 +21,7 @@ const (
 	deflateSuffix  = 80
 )
 
-// ReadDbHeaderBytes reads byte buffer containing serialised DB header element
+// ReadDbHeaderBytes reads DB header from input Reader at given offset and returns it as byte array
 func ReadDbHeaderBytes(input io.ReadSeeker, offset int64) (*[]byte, error) {
 	dataSize, bytesSkipped, err := readUint32Skip4K(input, offset)
 	if err != nil {
@@ -49,7 +50,7 @@ func ReadDbHeaderBytes(input io.ReadSeeker, offset int64) (*[]byte, error) {
 	return &t, nil
 }
 
-// ReadNodeBytes reads byte buffer containing serialised Node element
+// ReadNodeBytes reads Node from input Reader at given offset and returns it as byte array
 func ReadNodeBytes(input io.ReadSeeker, offset int64) (*[]byte, error) {
 	dataSize, bytesSkipped, err := readUint32Skip4K(input, offset)
 	if err != nil {
@@ -64,7 +65,7 @@ func ReadNodeBytes(input io.ReadSeeker, offset int64) (*[]byte, error) {
 	return uncompressBuffer(buf)
 }
 
-// ReadDocumentBytes reads the actual stored document and returns respective buffer
+// ReadDocumentBytes reads actual stored document from input Reader at given offset and returns it as byte array
 func ReadDocumentBytes(input io.ReadSeeker, offset int64) (*[]byte, error) {
 	combinedSize, bytesSkipped, err := readUint32Skip4K(input, offset)
 	if err != nil {
@@ -100,6 +101,9 @@ func ReadDocumentBytes(input io.ReadSeeker, offset int64) (*[]byte, error) {
 }
 
 // uncompressBuffer uncompresses buffer if needed
+// For whatever reason there is inconistancy inside
+// CouchDB on how Snappy and Deflate compressions are
+// described in the data file
 func uncompressBuffer(buf *[]byte) (*[]byte, error) {
 	b := uint8((*buf)[0])
 	switch b {

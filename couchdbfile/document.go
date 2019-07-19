@@ -29,5 +29,9 @@ func (cf *CouchDbFile) WriteDocument(di *DocumentInfo, output *bytes.Buffer) err
 		return err
 	}
 	err = js.WriteJSONToBuffer(output)
+	if err != nil {
+		slog.Error(err)
+		return err
+	}
 	return nil
 }

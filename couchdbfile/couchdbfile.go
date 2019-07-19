@@ -1,3 +1,6 @@
+// Package couchdbfile provides interface to Couch DB file. It takes
+// provided Reader as input and tries to parse it as CouchDB file. It
+// contains methods to read Nodes and Documents.
 package couchdbfile
 
 import (

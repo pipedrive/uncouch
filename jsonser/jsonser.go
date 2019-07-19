@@ -1,3 +1,5 @@
+// Package jsonser renders JSON document from Erlang internal
+// representation into normal JSON
 package jsonser
 
 import (
@@ -46,14 +48,18 @@ func (js *JSONSer) putTerm(t *erlterm.Term) {
 	return
 }
 
-// WriteJSONToBuffer writes Erlang serialised JSON to given buffer
+// WriteJSONToBuffer writes Erlang serialised JSON to given buffer as normal JSON
 func (js *JSONSer) WriteJSONToBuffer(collector *bytes.Buffer) error {
 	err := js.readJSONValue(collector)
 	if err != nil {
 		slog.Error(err)
 		return err
 	}
-	collector.WriteString("\n")
+	_, err = collector.WriteString("\n")
+	if err != nil {
+		slog.Error(err)
+		return err
+	}
 	return nil
 }
 

@@ -5,13 +5,13 @@ import (
 	"github.com/pipedrive/uncouch/termite"
 )
 
-// KpNodeID is a subset of data in CouchDB Btree nodes we need for data extraction
+// KpNodeID is a subset of data in CouchDB Btree node we need for data extraction
 type KpNodeID struct {
 	Length   int32
 	Pointers []PointerID
 }
 
-// PointerID is a subset of data in CouchDB Btree nodes we need for data extraction
+// PointerID is a subset of data in CouchDB Btree node we need for data extraction
 type PointerID struct {
 	Key    []byte
 	Offset int64
@@ -20,13 +20,13 @@ type PointerID struct {
 	Size   int32
 }
 
-// KpNodeSeq is a subset of data in CouchDB Btree nodes we need for data extraction
+// KpNodeSeq is a subset of data in CouchDB Btree node we need for data extraction
 type KpNodeSeq struct {
 	Length   int32
 	Pointers []PointerSeq
 }
 
-// PointerSeq is a subset of data in CouchDB Btree nodes we need for data extraction
+// PointerSeq is a subset of data in CouchDB Btree node we need for data extraction
 type PointerSeq struct {
 	Seq    int64
 	Offset int64
@@ -34,13 +34,13 @@ type PointerSeq struct {
 	Size2  int64
 }
 
-// KvNode is a subset of data in CouchDB Btree nodes we need for data extraction
+// KvNode is a subset of data in CouchDB Btree node we need for data extraction
 type KvNode struct {
 	Length    int32
 	Documents []DocumentInfo
 }
 
-// DocumentInfo is a subset of data in CouchDB Btree nodes we need for data extraction
+// DocumentInfo is a subset of data in CouchDB Btree node we need for data extraction
 type DocumentInfo struct {
 	ID        []byte
 	UpdateSeq int64
@@ -50,7 +50,7 @@ type DocumentInfo struct {
 	Revisions []Revision
 }
 
-// Revision is a subset of data in CouchDB Btree nodes we need for data extraction
+// Revision is a subset of data in CouchDB Btree node we need for data extraction
 type Revision struct {
 	RevID     []byte
 	Offset    int64

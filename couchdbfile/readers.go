@@ -15,7 +15,7 @@ func (cf *CouchDbFile) ReadNodeBytes(offset int64) (*[]byte, error) {
 	return couchbytes.ReadNodeBytes(cf.input, offset)
 }
 
-// ReadIDNode reads node from data file
+// ReadIDNode reads ID Btree node from the given offset
 func (cf *CouchDbFile) ReadIDNode(offset int64) (*KpNodeID, *KvNode, error) {
 	// slog.Debugf("Starting readNode with offset %d", offset)
 	buf, err := couchbytes.ReadNodeBytes(cf.input, offset)
@@ -66,7 +66,7 @@ func (cf *CouchDbFile) ReadIDNode(offset int64) (*KpNodeID, *KvNode, error) {
 	}
 }
 
-// ReadSeqNode reads node from data file
+// ReadSeqNode reads Sequence Btree node from the given offset
 func (cf *CouchDbFile) ReadSeqNode(offset int64) (*KpNodeSeq, *KvNode, error) {
 	// slog.Debugf("Starting readNode with offset %d", offset)
 	buf, err := couchbytes.ReadNodeBytes(cf.input, offset)
@@ -117,7 +117,7 @@ func (cf *CouchDbFile) ReadSeqNode(offset int64) (*KpNodeSeq, *KvNode, error) {
 	}
 }
 
-// ReadDbHeader reads DB header from data file
+// ReadDbHeader reads DB header from input Reader
 func (cf *CouchDbFile) ReadDbHeader() (*DbHeader, error) {
 	offset, err := cf.Header.findHeader(cf.input, cf.size)
 	if err != nil {

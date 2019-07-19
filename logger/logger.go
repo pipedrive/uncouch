@@ -1,3 +1,5 @@
+// Package logger provides singleton logger for all the packages in the
+// application
 package logger
 
 import (

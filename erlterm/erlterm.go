@@ -1,3 +1,5 @@
+// Package erlterm provides data structure to store erlang Term in Go.
+// Only small subset of Erlang terms is supported.
 package erlterm
 
 const defaultBinarySize = 256
