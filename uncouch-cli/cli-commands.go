@@ -37,6 +37,39 @@ func cmdDataFunc(cmd *cobra.Command, args []string) error {
 	return writeData(cf)
 }
 
+func cmdHeadersFunc(cmd *cobra.Command, args []string) error {
+	outputdir := args[1]
+	_, err := os.Stat(outputdir)
+	if err != nil {
+		return err
+	}
+	filename := args[0]
+	f, err := os.Open(filename)
+	if err != nil {
+		slog.Error(err)
+		return err
+	}
+	defer f.Close()
+	fi, err := f.Stat()
+	if err != nil {
+		slog.Error(err)
+		return err
+	}
+	fileBytes, err := ioutil.ReadAll(f)
+	if err != nil {
+		slog.Error(err)
+		return err
+	}
+	memoryReader := bytes.NewReader(fileBytes)
+	cf, err := couchdbfile.New(memoryReader, fi.Size())
+	if err != nil {
+		slog.Error(err)
+		return err
+	}
+
+	return writeHeaders(cf, outputdir)
+}
+
 func cmdSandboxFunc(cmd *cobra.Command, args []string) error {
 	slog.Debug("Starting Sandbox ...")
 	var filename string

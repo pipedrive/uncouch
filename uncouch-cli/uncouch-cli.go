@@ -23,10 +23,17 @@ For many years people have printed back to the screen.`,
 	}
 
 	cmdData := &cobra.Command{
-		Use:   "data [filename]",
-		Short: "Dump .couch file data to stdout or specified file",
+		Use:   "data filename",
+		Short: "Dump .couch file data as JSON lines to stdout",
 		Args:  cobra.MinimumNArgs(1),
 		RunE:  cmdDataFunc,
+	}
+
+	cmdHeaders := &cobra.Command{
+		Use:   "headers filename path",
+		Short: "Dump headers as uncompressed bianry blocks to specified path",
+		Args:  cobra.MinimumNArgs(2),
+		RunE:  cmdHeadersFunc,
 	}
 
 	cmdSandbox := &cobra.Command{
@@ -44,6 +51,7 @@ For many years people have printed back to the screen.`,
 	rootCmd.AddCommand(cmdPrint)
 	rootCmd.AddCommand(cmdSandbox)
 	rootCmd.AddCommand(cmdData)
+	rootCmd.AddCommand(cmdHeaders)
 
 	err := rootCmd.Execute()
 	if err != nil {

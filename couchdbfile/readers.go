@@ -10,6 +10,11 @@ import (
 	"github.com/pipedrive/uncouch/erldeser"
 )
 
+// ReadNodeBytes reads node bytes from given offset
+func (cf *CouchDbFile) ReadNodeBytes(offset int64) (*[]byte, error) {
+	return couchbytes.ReadNodeBytes(cf.input, offset)
+}
+
 // ReadIDNode reads node from data file
 func (cf *CouchDbFile) ReadIDNode(offset int64) (*KpNodeID, *KvNode, error) {
 	// slog.Debugf("Starting readNode with offset %d", offset)
