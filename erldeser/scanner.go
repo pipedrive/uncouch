@@ -22,6 +22,7 @@ const (
 	StringExt       erlterm.TermType = 'k'
 	ListExt         erlterm.TermType = 'l'
 	BinaryExt       erlterm.TermType = 'm'
+	SmallBigExt	    erlterm.TermType = 'n'
 )
 
 // Scanner implements term scanner from provided io.Reader
@@ -68,6 +69,8 @@ func (s *Scanner) Scan(t *erlterm.Term) error {
 		s.readList(t)
 	case BinaryExt:
 		s.readBinary(t)
+	case SmallBigExt:
+		s.readSmallBig(t)
 	default:
 		err := fmt.Errorf("Unhandled term type %v", termType)
 		slog.Error(err)
@@ -81,7 +84,7 @@ func (s *Scanner) Rewind() {
 	s.offset = 0
 }
 
-// readNewFloat is reading serialised Erlang small integer
+// readNewFloat is reading serialised Erlang float
 func (s *Scanner) readNewFloat(t *erlterm.Term) {
 	bits := binary.LittleEndian.Uint64(s.input[s.offset : s.offset+8])
 	s.offset += 8
@@ -180,5 +183,29 @@ func (s *Scanner) readBinary(t *erlterm.Term) {
 
 	copy(t.Binary, s.input[s.offset:s.offset+binaryLength])
 	s.offset += binaryLength
+	return
+}
+
+// readSmallBig is reading serialised Erlang small big
+func (s *Scanner) readSmallBig(t *erlterm.Term) {
+	numberLength := int64(s.input[s.offset])
+	s.offset += 1
+
+	sign := int64(s.input[s.offset])
+	s.offset += 1
+
+	total := int64(0)
+	base := int64(256)
+	for i := int64(0); i < numberLength; i++ {
+		partialValue := int64(s.input[s.offset])
+		total += partialValue * int64(math.Pow(float64(base), float64(i)))
+		s.offset++
+	}
+	fmt.Println(string(sign))
+	total *= int64(math.Pow(float64((-1)), float64(sign)))
+
+	t.Term = SmallBigExt
+	t.IntegerValue = total
+
 	return
 }
