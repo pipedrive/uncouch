@@ -86,7 +86,7 @@ func (s *Scanner) Rewind() {
 
 // readNewFloat is reading serialised Erlang float
 func (s *Scanner) readNewFloat(t *erlterm.Term) {
-	bits := binary.LittleEndian.Uint64(s.input[s.offset : s.offset+8])
+	bits := binary.BigEndian.Uint64(s.input[s.offset : s.offset+8])
 	s.offset += 8
 	floatValue := math.Float64frombits(bits)
 	t.Term = NewFloatExt
@@ -188,6 +188,8 @@ func (s *Scanner) readBinary(t *erlterm.Term) {
 
 // readSmallBig is reading serialised Erlang small big
 func (s *Scanner) readSmallBig(t *erlterm.Term) {
+	t.Term = SmallBigExt
+
 	numberLength := int64(s.input[s.offset])
 	s.offset += 1
 
@@ -201,10 +203,8 @@ func (s *Scanner) readSmallBig(t *erlterm.Term) {
 		total += partialValue * int64(math.Pow(float64(base), float64(i)))
 		s.offset++
 	}
-	fmt.Println(string(sign))
-	total *= int64(math.Pow(float64((-1)), float64(sign)))
+	total *= int64(math.Pow(float64(-1), float64(sign)))
 
-	t.Term = SmallBigExt
 	t.IntegerValue = total
 
 	return
