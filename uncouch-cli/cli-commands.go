@@ -2,9 +2,13 @@ package main
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
+	"github.com/pipedrive/uncouch/aws"
 	"io/ioutil"
 	"os"
 	"runtime"
+	"strings"
 
 	"github.com/pipedrive/uncouch/couchdbfile"
 	"github.com/spf13/cobra"
@@ -12,29 +16,40 @@ import (
 
 func cmdDataFunc(cmd *cobra.Command, args []string) error {
 	filename := args[0]
-	f, err := os.Open(filename)
+
+	var (
+		fileBytes []byte
+		n int64
+		err error
+	)
+
+	if strings.HasPrefix(filename, "s3://") {
+		fileBytes, n, err = aws.S3FileDownloader(filename)
+	} else {
+		fileBytes, n, err = readInputFile(filename)
+	}
+
 	if err != nil {
 		slog.Error(err)
 		return err
 	}
-	defer f.Close()
-	fi, err := f.Stat()
-	if err != nil {
-		slog.Error(err)
-		return err
-	}
-	fileBytes, err := ioutil.ReadAll(f)
-	if err != nil {
-		slog.Error(err)
-		return err
-	}
+
 	memoryReader := bytes.NewReader(fileBytes)
-	cf, err := couchdbfile.New(memoryReader, fi.Size())
+	cf, err := couchdbfile.New(memoryReader, n)
 	if err != nil {
 		slog.Error(err)
 		return err
 	}
-	return writeData(cf)
+
+	newFilename := createOutputFilename(filename)
+	if newFilename == "" {
+		err := errors.New("Could not create output filename.")
+		slog.Error(err)
+		return err
+	}
+
+	fmt.Println("New Filename: " + newFilename)
+	return writeData(cf, newFilename)
 }
 
 func cmdHeadersFunc(cmd *cobra.Command, args []string) error {

@@ -4,10 +4,28 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 
+	"github.com/pipedrive/uncouch/aws"
 	"github.com/pipedrive/uncouch/couchdbfile"
 	"github.com/pipedrive/uncouch/leakybucket"
-)
+	)
+
+func fileWriter(str *strings.Builder, filename string) (error) {
+	f, err := os.Create(filename)
+	if err != nil {
+		slog.Error(err)
+		return err
+	}
+	defer f.Close()
+
+	_, err = f.WriteString(str.String())
+	if err != nil {
+		slog.Error(err)
+		return err
+	}
+	return nil
+}
 
 func writeHeaders(cf *couchdbfile.CouchDbFile, outputdir string) error {
 	err := dumpIDNodeHeaders(cf, cf.Header.IDTreeState.Offset, outputdir)
@@ -22,6 +40,7 @@ func writeHeaders(cf *couchdbfile.CouchDbFile, outputdir string) error {
 	}
 	return nil
 }
+
 func writeNodeToFile(cf *couchdbfile.CouchDbFile, offset int64, filename string) error {
 	f, err := os.Create(filename)
 	if err != nil {
@@ -113,9 +132,21 @@ func dumpSeqNodeHeaders(cf *couchdbfile.CouchDbFile, offset int64, outputdir str
 	}
 }
 
-func writeData(cf *couchdbfile.CouchDbFile) error {
+func writeData(cf *couchdbfile.CouchDbFile, filename string) error {
+	var str strings.Builder
 
-	err := processSeqNode(cf, cf.Header.SeqTreeState.Offset)
+	err := processSeqNode(cf, cf.Header.SeqTreeState.Offset, &str)
+	if err != nil {
+		slog.Error(err)
+		return err
+	}
+
+	if strings.HasPrefix(filename, "s3://") {
+		err = aws.S3FileWriter(&str, filename)
+	} else {
+		err = fileWriter(&str, filename)
+	}
+
 	// return processIDNode(cf, cf.Header.IDTreeState.Offset)
 	// slog.Debug(termite.GetProfilerData())
 	return err
@@ -154,7 +185,7 @@ func processIDNode(cf *couchdbfile.CouchDbFile, offset int64) error {
 	}
 }
 
-func processSeqNode(cf *couchdbfile.CouchDbFile, offset int64) error {
+func processSeqNode(cf *couchdbfile.CouchDbFile, offset int64, str *strings.Builder) error {
 	for {
 		kpNode, kvNode, err := cf.ReadSeqNode(offset)
 		if err != nil {
@@ -164,7 +195,7 @@ func processSeqNode(cf *couchdbfile.CouchDbFile, offset int64) error {
 		if kpNode != nil {
 			// Pointer node, dig deeper
 			for _, node := range kpNode.Pointers {
-				err = processSeqNode(cf, node.Offset)
+				err = processSeqNode(cf, node.Offset, str)
 				if err != nil {
 					slog.Error(err)
 					return err
@@ -180,7 +211,8 @@ func processSeqNode(cf *couchdbfile.CouchDbFile, offset int64) error {
 					return err
 				}
 			}
-			fmt.Print(output.String())
+			str.Write(output.Bytes())
+			// fmt.Print(output.String())
 			leakybucket.PutBuffer(output)
 			return nil
 		}

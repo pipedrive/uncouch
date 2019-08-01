@@ -33,6 +33,7 @@ func ReadDbHeaderBytes(input io.ReadSeeker, offset int64) (*[]byte, error) {
 		slog.Error(err)
 		return nil, err
 	}
+	/*
 	bufReader := bytes.NewReader(*buf)
 	var md5Hash [16]byte
 	err = binary.Read(bufReader, binary.BigEndian, &md5Hash)
@@ -41,11 +42,11 @@ func ReadDbHeaderBytes(input io.ReadSeeker, offset int64) (*[]byte, error) {
 		return nil, err
 	}
 	var magicNumber uint8
-	binary.Read(bufReader, binary.BigEndian, &magicNumber)
+	err = binary.Read(bufReader, binary.BigEndian, &magicNumber)
 	if err != nil {
 		slog.Error(err)
 		return nil, err
-	}
+	}*/
 	t := (*buf)[17:]
 	return &t, nil
 }
