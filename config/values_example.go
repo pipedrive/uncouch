@@ -1,5 +1,5 @@
 package config
-/*
+
 const (
 	AWS_REGION = ""
 	AWS_PROFILE = ""
@@ -9,8 +9,7 @@ const (
 	S3_LEAVE_PARTS_ON_ERROR = false
 	TEMP_INPUT_DIR = ""
 	TEMP_OUTPUT_DIR = ""
-	OUTPUT_FILENAME = ""
-	WORKERSQ = 0
+	WORKERS_Q = 0
 	WRITE_LOCAL_FILE_FLAG = false
 )
-*/
+
