@@ -28,6 +28,13 @@ For many years people have printed back to the screen.`,
 		RunE:  cmdDataFunc,
 	}
 
+	cmdUntar := &cobra.Command{
+		Use:   "untar filename",
+		Short: "Uncompress .tar file with couch data and create .tar file with processed JSON data files.",
+		Args:  cobra.MinimumNArgs(1),
+		RunE:  cmdUntarFunc,
+	}
+
 	cmdHeaders := &cobra.Command{
 		Use:   "headers filename path",
 		Short: "Dump headers as uncompressed bianry blocks to specified path",
@@ -50,6 +57,7 @@ For many years people have printed back to the screen.`,
 	rootCmd.AddCommand(cmdPrint)
 	rootCmd.AddCommand(cmdSandbox)
 	rootCmd.AddCommand(cmdData)
+	rootCmd.AddCommand(cmdUntar)
 	rootCmd.AddCommand(cmdHeaders)
 
 	err := rootCmd.Execute()

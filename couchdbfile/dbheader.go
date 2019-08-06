@@ -3,10 +3,9 @@ package couchdbfile
 import (
 	"encoding/binary"
 	"fmt"
-	"io"
-
 	"github.com/pipedrive/uncouch/couchbytes"
 	"github.com/pipedrive/uncouch/termite"
+	"io"
 )
 
 // TreeState is subset of data in db header we care for our purposes
@@ -68,9 +67,22 @@ func (dbh *DbHeader) readFromTermite(t *termite.Termite) error {
 	}
 	dbh.DiskVersion = uint8(t.Children[1].T.IntegerValue)
 	dbh.UpdateSeq = int32(t.Children[2].T.IntegerValue)
-	dbh.IDTreeState.Offset = int64(t.Children[4].Children[0].T.IntegerValue)
-	dbh.IDTreeState.Size = int32(t.Children[4].Children[2].T.IntegerValue)
-	dbh.SeqTreeState.Offset = int64(t.Children[5].Children[0].T.IntegerValue)
-	dbh.SeqTreeState.Size = int32(t.Children[5].Children[2].T.IntegerValue)
+
+	if len(t.Children[4].Children) >= 3 {
+		dbh.IDTreeState.Offset = int64(t.Children[4].Children[0].T.IntegerValue)
+		dbh.IDTreeState.Size = int32(t.Children[4].Children[2].T.IntegerValue)
+	} else {
+		dbh.IDTreeState.Offset = 0
+		dbh.IDTreeState.Size = 0
+	}
+
+	if len(t.Children[5].Children) >= 3 {
+		dbh.SeqTreeState.Offset = int64(t.Children[5].Children[0].T.IntegerValue)
+		dbh.SeqTreeState.Size = int32(t.Children[5].Children[2].T.IntegerValue)
+	} else {
+		dbh.SeqTreeState.Offset = 0
+		dbh.SeqTreeState.Size = 0
+	}
+
 	return nil
 }

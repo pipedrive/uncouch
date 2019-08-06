@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/pipedrive/uncouch/config"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -16,19 +17,40 @@ func createOutputFilename(filename string) string {
 		slog.Error(err)
 		return ""
 	}
-	dir := u.Host
 	file := u.Path
 
-	fmt.Println("Dir: " + dir)
 	fileExt := filepath.Ext(file)
 
 	t := time.Now()
 	ts := fmt.Sprint(t.Format("_20060102_150405"))
 
+	temp := strings.Replace(file, config.TEMP_INPUT_DIR, config.TEMP_OUTPUT_DIR, 1)
+
 	newExt := ts + ".json"
-	u.Path = strings.Replace(file, fileExt, newExt, -1)
+
+	u.Path = strings.Replace(temp, fileExt, newExt, 1)
+
 	return u.String()
 }
+
+func createOutputTarFilename(filename string) string {
+	u, err := url.Parse(filename)
+	if err != nil {
+		slog.Error(err)
+		return ""
+	}
+	file := u.Path
+
+	ts := fmt.Sprint(time.Now().Format("_20060102_150405"))
+
+	fileExt := ".tar.gz"
+	newExt := ts + ".tar.gz"
+
+	u.Path = strings.Replace(file, fileExt, newExt, 1)
+
+	return u.String()
+}
+
 
 func readInputFile(filename string) ([]byte, int64, error) {
 

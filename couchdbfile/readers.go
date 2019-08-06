@@ -69,6 +69,10 @@ func (cf *CouchDbFile) ReadIDNode(offset int64) (*KpNodeID, *KvNode, error) {
 // ReadSeqNode reads Sequence Btree node from the given offset
 func (cf *CouchDbFile) ReadSeqNode(offset int64) (*KpNodeSeq, *KvNode, error) {
 	// slog.Debugf("Starting readNode with offset %d", offset)
+	if offset == 0 {
+		return nil, nil, nil
+	}
+
 	buf, err := couchbytes.ReadNodeBytes(cf.input, offset)
 	if err != nil {
 		slog.Error(err)

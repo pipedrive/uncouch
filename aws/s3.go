@@ -6,15 +6,16 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/pipedrive/uncouch/config"
+	"io"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 )
 
-func S3FileWriter(str *strings.Builder, filename string) (error) {
+func S3FileWriter(file io.Reader, filename string) (error) {
 
-	file := strings.NewReader(str.String())
+	//file := strings.NewReader(str.String())
 	_, keyName := filepath.Split(filename)
 
 	bucketName := config.S3_BUCKET
@@ -44,7 +45,7 @@ func S3FileWriter(str *strings.Builder, filename string) (error) {
 	return nil
 }
 
-func S3FileDownloader(filename string) ([]byte, int64, error) {
+func S3FileReader(filename string) ([]byte, int64, error) {
 	// The S3 client the S3 Downloader will use
 	s3Svc := s3.New(sess)
 
@@ -62,9 +63,8 @@ func S3FileDownloader(filename string) ([]byte, int64, error) {
 		d.PartSize = 5 * 1024 * 1024 // 5MB per part
 	})
 
-
 	n, err := downloader.Download(buf, &s3.GetObjectInput {
-		Bucket: aws.String(config.S3_BUCKET),
+		Bucket: aws.String(u.Host),
 		Key: aws.String(u.Path),
 	})
 	if err != nil {
@@ -75,4 +75,51 @@ func S3FileDownloader(filename string) ([]byte, int64, error) {
 	log.Info("Downloaded from S3: " + strconv.FormatInt(n, 10) + " bytes.")
 
 	return buf.Bytes(), n, nil
+}
+
+func S3FileDownloader(filename string) (string, error) {
+
+	// The S3 client the S3 Downloader will use
+	s3Svc := s3.New(sess)
+
+	u, err := url.Parse(filename)
+	if err != nil {
+		slog.Error(err)
+		return "", err
+	}
+
+	_, fname := filepath.Split(filename)
+
+	item := filepath.Join(config.TEMP_INPUT_DIR, fname)
+
+	file, err := os.Create(item)
+	if err != nil {
+		return "", err
+	}
+
+	defer file.Close()
+
+	// Create a downloader with the s3 client and custom options
+	downloader := s3manager.NewDownloaderWithClient(s3Svc, func(d *s3manager.Downloader) {
+		d.PartSize = 5 * 1024 * 1024 // 5MB per part
+	})
+
+	n, err := downloader.Download(file, &s3.GetObjectInput {
+		Bucket: aws.String(u.Host),
+		Key: aws.String(u.Path),
+	})
+	if err != nil {
+		slog.Error(err)
+		return "", err
+	}
+
+	log.Info("Downloaded from S3: " + strconv.FormatInt(n, 10) + " bytes.")
+
+	return item, nil
+}
+
+func S3FileUploader(filename, destination string) (error) {
+	// Hello, there!
+
+	return nil
 }

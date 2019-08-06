@@ -142,7 +142,8 @@ func writeData(cf *couchdbfile.CouchDbFile, filename string) error {
 	}
 
 	if strings.HasPrefix(filename, "s3://") {
-		err = aws.S3FileWriter(&str, filename)
+		file := strings.NewReader(str.String())
+		err = aws.S3FileWriter(file, filename)
 	} else {
 		err = fileWriter(&str, filename)
 	}
@@ -182,6 +183,7 @@ func processIDNode(cf *couchdbfile.CouchDbFile, offset int64) error {
 			leakybucket.PutBuffer(output)
 			return nil
 		}
+		return nil
 	}
 }
 
@@ -216,5 +218,6 @@ func processSeqNode(cf *couchdbfile.CouchDbFile, offset int64, str *strings.Buil
 			leakybucket.PutBuffer(output)
 			return nil
 		}
+		return nil
 	}
 }
