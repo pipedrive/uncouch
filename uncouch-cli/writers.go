@@ -1,30 +1,87 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"github.com/pipedrive/uncouch/config"
+	"github.com/pipedrive/uncouch/couchdbfile"
+	"github.com/pipedrive/uncouch/leakybucket"
 	"os"
 	"path"
 	"strings"
+	"sync"
+)
 
-	"github.com/pipedrive/uncouch/aws"
-	"github.com/pipedrive/uncouch/couchdbfile"
-	"github.com/pipedrive/uncouch/leakybucket"
-	)
+type FileContent struct {
+	Cf *couchdbfile.CouchDbFile
+	Filename string
+}
+
+func (f FileContent) mergeWriteData(mu *sync.Mutex) (string, error) {
+	var str strings.Builder
+
+	err := processSeqNode(f.Cf, f.Cf.Header.SeqTreeState.Offset, &str)
+	if err != nil {
+		slog.Error(err)
+		return "", err
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	newFilename, err := fileMerger(&str, f.Filename)
+	if err != nil {
+		slog.Error(err)
+	}
+
+	return newFilename, err
+}
+
+func fileMerger(str *strings.Builder, filename string) (string, error) {
+
+	var newFilename string
+	i := uint8(0)
+	for {
+		newFilename = createOutputFilenameWithIndex(filename, i)
+		if newFilename == "" {
+			err := errors.New("Could not create output filename.")
+			slog.Error(err)
+			return "", err
+		}
+
+		if fi, err := os.Stat(newFilename); err == nil {
+			if fi.Size() >= config.FILE_SIZE {
+				i++
+				continue
+			} else {
+				break
+			}
+		} else if os.IsNotExist(err) {
+			break
+		} else {
+			slog.Error(err)
+			return "", err
+		}
+		i++
+	}
+	err := fileWriter(str, newFilename)
+
+	return newFilename, err
+}
 
 func fileWriter(str *strings.Builder, filename string) (error) {
-	f, err := os.Create(filename)
+	f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		slog.Error(err)
 		return err
 	}
-	defer f.Close()
 
 	_, err = f.WriteString(str.String())
 	if err != nil {
 		slog.Error(err)
 		return err
 	}
-	return nil
+	return f.Close()
 }
 
 func writeHeaders(cf *couchdbfile.CouchDbFile, outputdir string) error {
@@ -141,12 +198,7 @@ func writeData(cf *couchdbfile.CouchDbFile, filename string) error {
 		return err
 	}
 
-	if strings.HasPrefix(filename, "s3://") {
-		file := strings.NewReader(str.String())
-		err = aws.S3FileWriter(file, filename)
-	} else {
-		err = fileWriter(&str, filename)
-	}
+	err = fileWriter(&str, filename)
 
 	// return processIDNode(cf, cf.Header.IDTreeState.Offset)
 	// slog.Debug(termite.GetProfilerData())

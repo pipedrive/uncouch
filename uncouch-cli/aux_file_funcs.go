@@ -1,17 +1,20 @@
 package main
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
-	"github.com/pipedrive/uncouch/config"
+	"github.com/pipedrive/uncouch/couchdbfile"
 	"io/ioutil"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
 
-func createOutputFilename(filename string) string {
+func createOutputFilename(filename, dstFolder string) string {
 	u, err := url.Parse(filename)
 	if err != nil {
 		slog.Error(err)
@@ -22,9 +25,12 @@ func createOutputFilename(filename string) string {
 	fileExt := filepath.Ext(file)
 
 	t := time.Now()
-	ts := fmt.Sprint(t.Format("_20060102_150405"))
+	ts := fmt.Sprint(t.Format("_20060102"))
 
-	temp := strings.Replace(file, config.TEMP_INPUT_DIR, config.TEMP_OUTPUT_DIR, 1)
+	if dstFolder == "" {
+		dstFolder = filepath.Dir(filename)
+	}
+	temp := strings.Replace(file, filepath.Dir(filename), dstFolder, 1)
 
 	newExt := ts + ".json"
 
@@ -33,27 +39,16 @@ func createOutputFilename(filename string) string {
 	return u.String()
 }
 
-func createOutputTarFilename(filename string) string {
-	u, err := url.Parse(filename)
-	if err != nil {
-		slog.Error(err)
-		return ""
-	}
-	file := u.Path
+func createOutputFilenameWithIndex(filename string, index uint8) string {
+	s      := "00" + strconv.Itoa(int(index))
 
-	ts := fmt.Sprint(time.Now().Format("_20060102_150405"))
+	fileExt := ".json"
+	newExt := "_" + s[len(s)-2:] + ".json"
 
-	fileExt := ".tar.gz"
-	newExt := ts + ".tar.gz"
-
-	u.Path = strings.Replace(file, fileExt, newExt, 1)
-
-	return u.String()
+	return strings.Replace(filename, fileExt, newExt, 1)
 }
 
-
 func readInputFile(filename string) ([]byte, int64, error) {
-
 	f, err := os.Open(filename)
 	if err != nil {
 		slog.Error(err)
@@ -75,3 +70,28 @@ func readInputFile(filename string) ([]byte, int64, error) {
 	return fileBytes, fi.Size(), nil
 }
 
+func auxDataFunc(filename, dstFolder string) (FileContent, error) {
+
+	var file FileContent
+
+	fileBytes, n, err := readInputFile(filename)
+	if err != nil {
+		slog.Error(err)
+		return file, err
+	}
+
+	memoryReader := bytes.NewReader(fileBytes)
+	cf, err := couchdbfile.New(memoryReader, n)
+	if err != nil {
+		slog.Error(errors.New("Error in file: " + filename))
+		slog.Error(err)
+		return file, err
+	}
+	fileBytes = nil
+
+	filename = createOutputFilename(filename, dstFolder)
+
+	file = FileContent{cf, filename}
+
+	return file, nil
+}

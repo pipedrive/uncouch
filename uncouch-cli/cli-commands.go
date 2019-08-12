@@ -4,60 +4,47 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/pipedrive/uncouch/aws"
 	"github.com/pipedrive/uncouch/config"
 	"github.com/pipedrive/uncouch/couchdbfile"
 	"github.com/pipedrive/uncouch/tar"
 	"github.com/spf13/cobra"
-	"io"
 	"io/ioutil"
 	"os"
+	"path"
 	"runtime"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
 func cmdDataFunc(cmd *cobra.Command, args []string) error {
 	filename := args[0]
 
-	var (
-		fileBytes []byte
-		n int64
-		err error
-	)
-
-	if strings.HasPrefix(filename, "s3://") {
-		fileBytes, n, err = aws.S3FileReader(filename)
-	} else {
-		fileBytes, n, err = readInputFile(filename)
-	}
-
+	fc, err := auxDataFunc(filename, "")
 	if err != nil {
 		slog.Error(err)
 		return err
 	}
 
-	memoryReader := bytes.NewReader(fileBytes)
-	cf, err := couchdbfile.New(memoryReader, n)
-	if err != nil {
-		slog.Error(errors.New("Error in file: " + filename))
-		slog.Error(err)
-		return err
-	}
-
-	newFilename := createOutputFilename(filename)
-	if newFilename == "" {
-		err := errors.New("Could not create output filename.")
-		slog.Error(err)
-		return err
-	}
-
-	fmt.Println("New Filename: " + newFilename)
-	return writeData(cf, newFilename)
+	return writeData(fc.Cf, fc.Filename)
 }
 
 func cmdUntarFunc(cmd *cobra.Command, args []string) error {
-	filename := args[0]
+	var filename string = args[0]
+	var dstFolder string = args[1]
+
+	workersQ, err := strconv.ParseUint(args[2], 10, 8)
+	if err != nil {
+		slog.Error(err)
+		return err
+	}
+
+	writersQ, err := strconv.ParseUint(args[3], 10, 8)
+	if err != nil {
+		slog.Error(err)
+		return err
+	}
 
 	if ! strings.HasSuffix(filename, ".tar.gz") {
 		err := errors.New("File is not .tar.gz")
@@ -65,22 +52,17 @@ func cmdUntarFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	var err error
-	oldFilename := filename
-	if strings.HasPrefix(filename, "s3://") {
-		filename, err = aws.S3FileDownloader(filename)
-		if err != nil {
-			slog.Error(err)
-			return err
-		}
-	}
+	var wgp, wgw sync.WaitGroup
 
 	// Open tar.gz file.
 		filesChan := make(chan tar.UntarredFile)
+		writesChan := make(chan FileContent)
 		untarDone := make(chan tar.Done)
 		var (
 			oksChan []string
 			errorsChan []error
+			woksChan []string
+			werrorsChan []error
 		)
 
 	f, err := os.Open(filename)
@@ -89,10 +71,16 @@ func cmdUntarFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	go tar.Untar(config.TEMP_INPUT_DIR, f, filesChan, untarDone)
+	startTs := time.Now().Format("20060102_150405")
 
-	workersQ := config.WORKERS_Q
-	createWorkers(workersQ, filesChan, &oksChan, &errorsChan)
+	_, name := path.Split(filename)
+
+	inputFolder := path.Join(config.TEMP_INPUT_DIR, strings.TrimSuffix(name, ".tar.gz"), startTs)
+
+	go tar.Untar(inputFolder, f, filesChan, untarDone)
+
+	createWorkers(workersQ, filesChan, writesChan, dstFolder, &wgp, &oksChan, &errorsChan)
+	createWriters(writersQ, writesChan, &wgw, &woksChan, &werrorsChan)
 
 	d := <- untarDone
 	if !d.Res {
@@ -100,28 +88,16 @@ func cmdUntarFunc(cmd *cobra.Command, args []string) error {
 		slog.Error(err)
 		return err
 	}
+	close(untarDone)
 
-	waitingTime := 0
-	for {
-		if uint32(len(oksChan) + len(errorsChan)) >= d.FileQ {
-			break
-		}
-
-		if waitingTime > 5 {
-			if uint32(len(oksChan) + len(errorsChan)) != d.FileQ {
-				errMessage := fmt.Sprintf("Not enough files processed. Expected: %v. Processed: %v. Ok: %v. Errors: %v", d.FileQ, len(oksChan) + len(errorsChan), len(oksChan), len(errorsChan))
-				err := errors.New(errMessage)
-				slog.Error(err)
-				return err
-			}
-		}
-
-		time.Sleep(1 * time.Minute)
-		waitingTime += 1
-	}
-
-	for _, f := range oksChan {
-		fmt.Printf("Processed file: %s\n", f)
+	wgp.Wait()
+	close(writesChan)
+	total := uint32(len(oksChan) + len(errorsChan))
+	if total != d.FileQ {
+		errMessage := fmt.Sprintf("Expected files: %v. Processed: %v. Ok: %v. Errors: %v", d.FileQ, total, len(oksChan), len(errorsChan))
+		err := errors.New(errMessage)
+		slog.Error(err)
+		return err
 	}
 
 	if len(errorsChan) > 0 {
@@ -129,41 +105,31 @@ func cmdUntarFunc(cmd *cobra.Command, args []string) error {
 		slog.Error(err)
 		for _, err := range errorsChan {
 			slog.Error(err)
-			return err
 		}
+		return err
 	}
 
-	// tarPath := path.Join(config.TEMP_OUTPUT_DIR, config.OUTPUT_FILENAME + ".tar.gz")
-	tarPath := createOutputTarFilename(filename)
-
-	var buf bytes.Buffer
-
-	err = tar.Tar(config.TEMP_OUTPUT_DIR, &buf)
-	if err != nil {
+	wgw.Wait()
+	total = uint32(len(woksChan) + len(werrorsChan))
+	if total != d.FileQ {
+		errMessage := fmt.Sprintf("Not enough files written. Expected: %v. Processed: %v. Ok: %v. Errors: %v", d.FileQ, total, len(woksChan), len(werrorsChan))
+		err := errors.New(errMessage)
 		slog.Error(err)
+		return err
 	}
 
-	// If origin was S3, send result to S3.
-	if strings.HasPrefix(oldFilename, "s3://") {
-		newFilename := createOutputTarFilename(oldFilename)
-		file := bytes.NewReader(buf.Bytes())
-		err = aws.S3FileWriter(file, newFilename)
-		if err != nil {
-			slog.Error(err)
-			return err
-		}
-	} else {
-		// otherwise, write the .tar.gzip to local storage
-		fileToWrite, err := os.OpenFile(tarPath, os.O_CREATE|os.O_RDWR, os.FileMode(0755))
-		if err != nil {
-			slog.Error(err)
-			return err
-		}
-		if _, err := io.Copy(fileToWrite, &buf); err != nil {
-			slog.Error(err)
-		}
+	for _, f := range woksChan {
+		fmt.Printf("Written data to file: %s\n", f)
 	}
 
+	if len(werrorsChan) > 0 {
+		err := errors.New("Detected errors while writing files.")
+		slog.Error(err)
+		for _, err := range werrorsChan {
+			slog.Error(err)
+		}
+		return err
+	}
 
 	return err
 }

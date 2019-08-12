@@ -29,9 +29,9 @@ For many years people have printed back to the screen.`,
 	}
 
 	cmdUntar := &cobra.Command{
-		Use:   "untar filename",
-		Short: "Uncompress .tar file with couch data and create .tar file with processed JSON data files.",
-		Args:  cobra.MinimumNArgs(1),
+		Use:   "untar filename path workers writers",
+		Short: "Uncompress .tar file with couch data and create files with processed JSON data in specified output folder.",
+		Args:  cobra.MinimumNArgs(4),
 		RunE:  cmdUntarFunc,
 	}
 

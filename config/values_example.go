@@ -1,15 +1,8 @@
 package config
-
+/*
 const (
-	AWS_REGION = ""
-	AWS_PROFILE = ""
-	S3_BUCKET = ""
-	S3_PART_SIZE = 0
-	S3_SERVER_ENCRYPTION = ""
-	S3_LEAVE_PARTS_ON_ERROR = false
 	TEMP_INPUT_DIR = ""
-	TEMP_OUTPUT_DIR = ""
-	WORKERS_Q = 0
-	WRITE_LOCAL_FILE_FLAG = false
+	WRITE_LOCAL_FILE_FLAG = true
+	FILE_SIZE = 0
 )
-
+*/
