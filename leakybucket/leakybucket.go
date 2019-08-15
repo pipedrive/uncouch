@@ -4,11 +4,13 @@ package leakybucket
 
 import (
 	"bytes"
+	"strings"
 )
 
 var (
 	freeByteList   = make(chan *[]byte, 50)
 	freeBufferList = make(chan *bytes.Buffer, 50)
+	freeStrBuilderList   = make(chan *strings.Builder, 50)
 )
 
 // GetBytes returns byte slice with cap at least the size provided
@@ -63,4 +65,26 @@ func PutBuffer(b *bytes.Buffer) {
 		// Free list full, just carry on.
 	}
 	return
+}
+
+func GetStrBuilder() (b *strings.Builder) {
+	select {
+	case b = <-freeStrBuilderList:
+	default:
+		// None free, so allocate a new one.
+		var s strings.Builder
+		b = &s
+	}
+	return b
+}
+
+// PutBytes adds byte array to reuse list
+func PutStrBuilder(b *strings.Builder) {
+	b.Reset()
+	select {
+	case freeStrBuilderList <- b:
+		// Buffer on free list; nothing more to do.
+	default:
+		// Free list full, just carry on.
+	}
 }

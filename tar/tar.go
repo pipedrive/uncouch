@@ -2,11 +2,8 @@ package tar
 
 import (
 	"archive/tar"
-	"bytes"
 	"compress/gzip"
-	"fmt"
 	"github.com/pipedrive/uncouch/config"
-	"github.com/pipedrive/uncouch/leakybucket"
 	"io"
 	"io/ioutil"
 	"os"
@@ -16,7 +13,7 @@ import (
 
 type UntarredFile struct {
 	Filepath string
-	Input io.ReadSeeker
+	Input []byte
 	Size int64
 }
 
@@ -26,7 +23,7 @@ type Done struct {
 }
 
 
-func Untar(dst string, r io.Reader, filesChan chan UntarredFile, done chan Done) () {
+func Untar(dst string, r io.Reader, filesChan chan *UntarredFile, done chan Done) () {
 
 	fileQ := uint32(0)
 	gzr, err := gzip.NewReader(r)
@@ -63,10 +60,11 @@ func Untar(dst string, r io.Reader, filesChan chan UntarredFile, done chan Done)
 			done <- Done{Res:false, FileQ:fileQ}
 			return
 
-		// if the header is nil, just skip it (not sure how this happens)
+		// if the header is nil, just skip it.
 		case header == nil:
 			continue
 		}
+
 		// the target location where the dir/file should be created
 		target := filepath.Join(dst, header.Name)
 
@@ -75,14 +73,16 @@ func Untar(dst string, r io.Reader, filesChan chan UntarredFile, done chan Done)
 
 		// if its a dir and it doesn't exist create it
 		case tar.TypeDir:
-			if _, err := os.Stat(target); err != nil {
-				if err := os.MkdirAll(target, 0755); err != nil {
-					slog.Error(err)
-					done <- Done{Res:false, FileQ:fileQ}
-					return
+			if config.WRITE_LOCAL_FILE_FLAG {
+				if _, err := os.Stat(target); err != nil {
+					if err := os.MkdirAll(target, 0755); err != nil {
+						slog.Error(err)
+						done <- Done{Res:false, FileQ:fileQ}
+						return
+					}
 				}
 			}
-
+			continue
 
 		// if it's a file create it
 		case tar.TypeReg:
@@ -102,15 +102,14 @@ func Untar(dst string, r io.Reader, filesChan chan UntarredFile, done chan Done)
 				var f UntarredFile
 				f.Filepath = target
 
-				filesChan <- f
+				filesChan <- &f
 				// ENDS HERE.
 			} else {
 				//------------> This is the code to process the files without writing to disk.
 				f := processUntarredFile(target, tr, header, done)
-				filesChan <- *f
+				filesChan <- f
 				// ENDS HERE.
 			}
-
 		}
 	}
 }
@@ -128,30 +127,23 @@ func writeUntarredFile(target string, tr *tar.Reader, header *tar.Header) (error
 
 	// manually close here after each file operation; defering would cause each file close
 	// to wait until all operations have completed.
-	f.Close()
-	return nil
+	return f.Close()
 }
 
 func processUntarredFile(target string, tr *tar.Reader, header *tar.Header, done chan Done) (*UntarredFile) {
 	var f UntarredFile
 
-	buf := *leakybucket.GetBytes(int32(header.Size))
-
-	fmt.Printf("File: %s, Size: %v.\n", target, header.Size)
+	//log.Info(fmt.Sprintf("File: %s, Size: %v.", target, header.Size))
 	buf, err := ioutil.ReadAll(tr)
-	//_, err := tr.Read(buf)
 	if err != nil && err != io.EOF {
-		//err := errors.New("End of file not reached while reading file " + header.Name + ".")
 		slog.Error(err)
 		done <- Done{Res:false, FileQ:0}
 		return &f
 	}
 
 	f.Filepath = target
-	f.Input = bytes.NewReader(buf)
+	f.Input = buf
 	f.Size = header.Size
-
-	leakybucket.PutBytes(&buf)
 
 	return &f
 }

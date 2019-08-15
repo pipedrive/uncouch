@@ -1,10 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"github.com/pipedrive/uncouch/couchdbfile"
 	"github.com/pipedrive/uncouch/tar"
-	"io"
 	"strconv"
 	"sync"
 )
@@ -53,16 +53,17 @@ func (m muMap) Delete(f string, mapMutex *sync.Mutex) {
 
 }
 
-func createWorkers(workersQ uint64, filesChan chan tar.UntarredFile, writesChan chan FileContent, dstFolder string, wgp *sync.WaitGroup, oksChan *[]string, errorsChan *[]error) () {
+func createWorkers(workersQ uint64, filesChan chan *tar.UntarredFile, dstFolder string, wgp *sync.WaitGroup, oksChan *[]string, errorsChan *[]error) (chan FileContent) {
 	wgp.Add(int(workersQ))
+	writesChan := make(chan FileContent)
 	for i := uint64(0); i < workersQ; i++ {
 		log.Info("Starting worker: " + strconv.Itoa(int(i)))
 		go worker(filesChan, writesChan, dstFolder, wgp, oksChan, errorsChan, i)
 	}
-	return
+	return writesChan
 }
 
-func worker(filesChan chan tar.UntarredFile, writesChan chan FileContent, dstFolder string, wgp *sync.WaitGroup, oksChan *[]string, errorsChan *[]error, i uint64) () {
+func worker(filesChan chan *tar.UntarredFile, writesChan chan FileContent, dstFolder string, wgp *sync.WaitGroup, oksChan *[]string, errorsChan *[]error, i uint64) () {
 	for {
 		current, more := <- filesChan
 		if !more {
@@ -84,14 +85,17 @@ func worker(filesChan chan tar.UntarredFile, writesChan chan FileContent, dstFol
 		if err != nil {
 			*errorsChan = append(*errorsChan, err)
 			slog.Error(err)
+			continue
 		}
 		*oksChan = append(*oksChan, current.Filepath)
 		writesChan <- file
 	}
 }
 
-func processAll(memoryReader io.ReadSeeker, filename string, n int64, dstFolder string) (FileContent, error) {
+func processAll(buf []byte, filename string, n int64, dstFolder string) (FileContent, error) {
 	var file FileContent
+
+	memoryReader := bytes.NewReader(buf)
 
 	cf, err := couchdbfile.New(memoryReader, n)
 	if err != nil {
@@ -135,6 +139,7 @@ func writer(writesChan chan FileContent, wgw *sync.WaitGroup, woksChan *[]string
 			wgw.Done()
 			return
 		}
+		log.Info("Writing file: " + current.Filename)
 
 		mu := m.Get(current.Filename, mMutex)
 		// actual processing
@@ -143,9 +148,10 @@ func writer(writesChan chan FileContent, wgw *sync.WaitGroup, woksChan *[]string
 		if err != nil {
 			*werrorsChan = append(*werrorsChan, err)
 			slog.Error(err)
+		} else {
+			*woksChan = append(*woksChan, newFilename)
 		}
 		m.Delete(current.Filename, mMutex)
-		*woksChan = append(*woksChan, newFilename)
 	}
 	// fmt.Println("Finalizing writer: " + strconv.Itoa(i))
 }

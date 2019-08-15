@@ -55,8 +55,7 @@ func cmdUntarFunc(cmd *cobra.Command, args []string) error {
 	var wgp, wgw sync.WaitGroup
 
 	// Open tar.gz file.
-		filesChan := make(chan tar.UntarredFile)
-		writesChan := make(chan FileContent)
+		filesChan := make(chan *tar.UntarredFile)
 		untarDone := make(chan tar.Done)
 		var (
 			oksChan []string
@@ -79,10 +78,11 @@ func cmdUntarFunc(cmd *cobra.Command, args []string) error {
 
 	go tar.Untar(inputFolder, f, filesChan, untarDone)
 
-	createWorkers(workersQ, filesChan, writesChan, dstFolder, &wgp, &oksChan, &errorsChan)
+	writesChan := createWorkers(workersQ, filesChan, dstFolder, &wgp, &oksChan, &errorsChan)
 	createWriters(writersQ, writesChan, &wgw, &woksChan, &werrorsChan)
 
 	d := <- untarDone
+	log.Info("untarDone")
 	if !d.Res {
 		err := errors.New("Error while untarring file.")
 		slog.Error(err)
@@ -91,6 +91,7 @@ func cmdUntarFunc(cmd *cobra.Command, args []string) error {
 	close(untarDone)
 
 	wgp.Wait()
+	log.Info("File deserializing done.")
 	close(writesChan)
 	total := uint32(len(oksChan) + len(errorsChan))
 	if total != d.FileQ {
@@ -110,6 +111,7 @@ func cmdUntarFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	wgw.Wait()
+	log.Info("File writing done.")
 	total = uint32(len(woksChan) + len(werrorsChan))
 	if total != d.FileQ {
 		errMessage := fmt.Sprintf("Not enough files written. Expected: %v. Processed: %v. Ok: %v. Errors: %v", d.FileQ, total, len(woksChan), len(werrorsChan))
@@ -119,7 +121,7 @@ func cmdUntarFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	for _, f := range woksChan {
-		fmt.Printf("Written data to file: %s\n", f)
+		log.Info(fmt.Sprintf("Written data to file: %s", f))
 	}
 
 	if len(werrorsChan) > 0 {

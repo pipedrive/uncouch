@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/pipedrive/uncouch/config"
 	"github.com/pipedrive/uncouch/couchdbfile"
 	"io/ioutil"
 	"net/url"
@@ -13,6 +14,31 @@ import (
 	"strings"
 	"time"
 )
+
+func auxDataFunc(filename, dstFolder string) (FileContent, error) {
+
+	var file FileContent
+
+	fileBytes, n, err := readInputFile(filename)
+	if err != nil {
+		slog.Error(err)
+		return file, err
+	}
+
+	memoryReader := bytes.NewReader(fileBytes)
+	cf, err := couchdbfile.New(memoryReader, n)
+	if err != nil {
+		slog.Error(errors.New("Error in file: " + filename))
+		slog.Error(err)
+		return file, err
+	}
+
+	filename = createOutputFilename(filename, dstFolder)
+
+	file = FileContent{cf, filename}
+
+	return file, nil
+}
 
 func createOutputFilename(filename, dstFolder string) string {
 	u, err := url.Parse(filename)
@@ -32,7 +58,13 @@ func createOutputFilename(filename, dstFolder string) string {
 	}
 	temp := strings.Replace(file, filepath.Dir(filename), dstFolder, 1)
 
-	newExt := ts + ".json"
+	var newExt string
+	if config.COMPRESS_OUTPUT {
+		newExt = ts + ".json.gz"
+	} else {
+		newExt = ts + ".json"
+	}
+
 
 	u.Path = strings.Replace(temp, fileExt, newExt, 1)
 
@@ -42,8 +74,15 @@ func createOutputFilename(filename, dstFolder string) string {
 func createOutputFilenameWithIndex(filename string, index uint8) string {
 	s      := "00" + strconv.Itoa(int(index))
 
-	fileExt := ".json"
-	newExt := "_" + s[len(s)-2:] + ".json"
+	var (newExt string
+		fileExt string)
+	if config.COMPRESS_OUTPUT {
+		fileExt = ".json.gz"
+		newExt = "_" + s[len(s)-2:] + ".json.gz"
+	} else {
+		fileExt = ".json"
+		newExt = "_" + s[len(s)-2:] + ".json"
+	}
 
 	return strings.Replace(filename, fileExt, newExt, 1)
 }
@@ -68,30 +107,4 @@ func readInputFile(filename string) ([]byte, int64, error) {
 		return nil, 0, err
 	}
 	return fileBytes, fi.Size(), nil
-}
-
-func auxDataFunc(filename, dstFolder string) (FileContent, error) {
-
-	var file FileContent
-
-	fileBytes, n, err := readInputFile(filename)
-	if err != nil {
-		slog.Error(err)
-		return file, err
-	}
-
-	memoryReader := bytes.NewReader(fileBytes)
-	cf, err := couchdbfile.New(memoryReader, n)
-	if err != nil {
-		slog.Error(errors.New("Error in file: " + filename))
-		slog.Error(err)
-		return file, err
-	}
-	fileBytes = nil
-
-	filename = createOutputFilename(filename, dstFolder)
-
-	file = FileContent{cf, filename}
-
-	return file, nil
 }
