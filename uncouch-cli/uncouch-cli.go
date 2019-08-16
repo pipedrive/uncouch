@@ -9,6 +9,13 @@ import (
 )
 
 func main() {
+
+	var (
+	tmp_dir string
+	output_dir string
+	workers_Q int
+	)
+
 	// defer profile.Start().Stop()
 	cmdPrint := &cobra.Command{
 		Use:   "print [string to print]",
@@ -29,25 +36,28 @@ For many years people have printed back to the screen.`,
 	}
 
 	cmdUntar := &cobra.Command{
-		Use:   "untar filename path workers writers",
+		Use:   "untar filename",
 		Short: "Uncompress .tar file with couch data and create files with processed JSON data in specified output folder.",
-		Args:  cobra.MinimumNArgs(4),
-		RunE:  cmdUntarFunc,
+		Long: "Options:\ninput: string - Location of the file to process.\noutput: string - Location of the folder for the output files.",
+		Args:  cobra.MinimumNArgs(1),
+		Run:  func(cmd *cobra.Command, args []string) {
+			inputFile := args[0]
+			cmdUntarFunc(inputFile, output_dir, tmp_dir, uint(workers_Q))
+		},
 	}
+
+	cmdUntar.Flags().StringVarP(&output_dir, "dest", "d", "", "Folder for output files (required).")
+	cmdUntar.Flags().StringVarP(&tmp_dir, "temp", "t", "", "Folder to store untarred files.")
+	cmdUntar.Flags().IntVarP(&workers_Q, "workers", "w", 10, "Number of parallel workers (default 10).")
+	cmdUntar.MarkFlagRequired("destination")
 
 	cmdHeaders := &cobra.Command{
 		Use:   "headers filename path",
-		Short: "Dump headers as uncompressed bianry blocks to specified path",
+		Short: "Dump headers as uncompressed binary blocks to specified path",
 		Args:  cobra.MinimumNArgs(2),
 		RunE:  cmdHeadersFunc,
 	}
 
-	cmdSandbox := &cobra.Command{
-		Use:   "sandbox [filename]",
-		Short: "Sandbox routine",
-		// Args:  cobra.MinimumNArgs(1),
-		RunE: cmdSandboxFunc,
-	}
 
 	rootCmd := &cobra.Command{
 		Use:   "uncouch-cli",
@@ -55,7 +65,6 @@ For many years people have printed back to the screen.`,
 	}
 
 	rootCmd.AddCommand(cmdPrint)
-	rootCmd.AddCommand(cmdSandbox)
 	rootCmd.AddCommand(cmdData)
 	rootCmd.AddCommand(cmdUntar)
 	rootCmd.AddCommand(cmdHeaders)

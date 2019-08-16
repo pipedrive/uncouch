@@ -53,17 +53,17 @@ func (m muMap) Delete(f string, mapMutex *sync.Mutex) {
 
 }
 
-func createWorkers(workersQ uint64, filesChan chan *tar.UntarredFile, dstFolder string, wgp *sync.WaitGroup, oksChan *[]string, errorsChan *[]error) (chan FileContent) {
+func createWorkers(workersQ uint, filesChan chan *tar.UntarredFile, dstFolder string, wgp *sync.WaitGroup, oksChan *[]string, errorsChan *[]error) (chan FileContent) {
 	wgp.Add(int(workersQ))
 	writesChan := make(chan FileContent)
-	for i := uint64(0); i < workersQ; i++ {
+	for i := uint(0); i < workersQ; i++ {
 		log.Info("Starting worker: " + strconv.Itoa(int(i)))
 		go worker(filesChan, writesChan, dstFolder, wgp, oksChan, errorsChan, i)
 	}
 	return writesChan
 }
 
-func worker(filesChan chan *tar.UntarredFile, writesChan chan FileContent, dstFolder string, wgp *sync.WaitGroup, oksChan *[]string, errorsChan *[]error, i uint64) () {
+func worker(filesChan chan *tar.UntarredFile, writesChan chan FileContent, dstFolder string, wgp *sync.WaitGroup, oksChan *[]string, errorsChan *[]error, i uint) () {
 	for {
 		current, more := <- filesChan
 		if !more {
@@ -119,19 +119,19 @@ func processFiles(filename, dstFolder string) (FileContent, error) {
 	return file, err
 }
 
-func createWriters(writersQ uint64, writesChan chan FileContent, wgw *sync.WaitGroup, woksChan *[]string, werrorsChan *[]error) () {
+func createWriters(writersQ uint, writesChan chan FileContent, wgw *sync.WaitGroup, woksChan *[]string, werrorsChan *[]error) () {
 	wgw.Add(int(writersQ))
 	m := make(muMap)
 	var mapMutex sync.Mutex
 
-	for i := uint64(0); i < writersQ; i++ {
+	for i := uint(0); i < writersQ; i++ {
 		log.Info("Starting writer: " + strconv.Itoa(int(i)))
 		go writer(writesChan, wgw, woksChan, werrorsChan, i, m, &mapMutex)
 	}
 	return
 }
 
-func writer(writesChan chan FileContent, wgw *sync.WaitGroup, woksChan *[]string, werrorsChan *[]error, i uint64, m muMap, mMutex *sync.Mutex) () {
+func writer(writesChan chan FileContent, wgw *sync.WaitGroup, woksChan *[]string, werrorsChan *[]error, i uint, m muMap, mMutex *sync.Mutex) () {
 	for {
 		current, more := <- writesChan
 		if !more {

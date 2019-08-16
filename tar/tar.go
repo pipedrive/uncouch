@@ -3,7 +3,6 @@ package tar
 import (
 	"archive/tar"
 	"compress/gzip"
-	"github.com/pipedrive/uncouch/config"
 	"io"
 	"io/ioutil"
 	"os"
@@ -35,11 +34,15 @@ func Untar(dst string, r io.Reader, filesChan chan *UntarredFile, done chan Done
 	defer gzr.Close()
 	tr := tar.NewReader(gzr)
 
-	if _, err := os.Stat(dst); err != nil {
-		if err := os.MkdirAll(dst, 0755); err != nil {
-			slog.Error(err)
-			done <- Done{Res: false, FileQ: fileQ}
-			return
+	writeLocalFile := dst != ""
+
+	if writeLocalFile {
+		if _, err := os.Stat(dst); err != nil {
+			if err := os.MkdirAll(dst, 0755); err != nil {
+				slog.Error(err)
+				done <- Done{Res: false, FileQ: fileQ}
+				return
+			}
 		}
 	}
 
@@ -73,7 +76,7 @@ func Untar(dst string, r io.Reader, filesChan chan *UntarredFile, done chan Done
 
 		// if its a dir and it doesn't exist create it
 		case tar.TypeDir:
-			if config.WRITE_LOCAL_FILE_FLAG {
+			if writeLocalFile {
 				if _, err := os.Stat(target); err != nil {
 					if err := os.MkdirAll(target, 0755); err != nil {
 						slog.Error(err)
@@ -91,7 +94,7 @@ func Untar(dst string, r io.Reader, filesChan chan *UntarredFile, done chan Done
 			}
 			fileQ++
 			//------------> This is the code to write the files to disk.
-			if (config.WRITE_LOCAL_FILE_FLAG) {
+			if writeLocalFile {
 				err := writeUntarredFile(target, tr, header)
 				if err != nil {
 					slog.Error(err)

@@ -4,18 +4,13 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/pipedrive/uncouch/config"
 	"github.com/pipedrive/uncouch/couchdbfile"
 	"github.com/pipedrive/uncouch/tar"
 	"github.com/spf13/cobra"
 	"io/ioutil"
 	"os"
-	"path"
-	"runtime"
-	"strconv"
 	"strings"
 	"sync"
-	"time"
 )
 
 func cmdDataFunc(cmd *cobra.Command, args []string) error {
@@ -30,21 +25,11 @@ func cmdDataFunc(cmd *cobra.Command, args []string) error {
 	return writeData(fc.Cf, fc.Filename)
 }
 
-func cmdUntarFunc(cmd *cobra.Command, args []string) error {
-	var filename string = args[0]
-	var dstFolder string = args[1]
+func cmdUntarFunc(input, output, tmp_dir string, workersQ uint) error {
+	var filename string = input
+	var dstFolder string = output
 
-	workersQ, err := strconv.ParseUint(args[2], 10, 8)
-	if err != nil {
-		slog.Error(err)
-		return err
-	}
-
-	writersQ, err := strconv.ParseUint(args[3], 10, 8)
-	if err != nil {
-		slog.Error(err)
-		return err
-	}
+	writersQ := workersQ
 
 	if ! strings.HasSuffix(filename, ".tar.gz") {
 		err := errors.New("File is not .tar.gz")
@@ -70,11 +55,7 @@ func cmdUntarFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	startTs := time.Now().Format("20060102_150405")
-
-	_, name := path.Split(filename)
-
-	inputFolder := path.Join(config.TEMP_INPUT_DIR, strings.TrimSuffix(name, ".tar.gz"), startTs)
+	inputFolder := tmp_dir
 
 	go tar.Untar(inputFolder, f, filesChan, untarDone)
 
@@ -167,51 +148,4 @@ func cmdHeadersFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	return writeHeaders(cf, outputdir)
-}
-
-func cmdSandboxFunc(cmd *cobra.Command, args []string) error {
-	slog.Debug("Starting Sandbox ...")
-	var filename string
-	if len(args) == 0 {
-		switch runtime.GOOS {
-		case "windows":
-			// filename = "c:\\Data\\uncouch\\sandbox.1553883929.couch"
-			// filename = "c:\\Data\\uncouch\\test01.1555094281.empty.couch"
-			// filename = "c:\\Data\\uncouch\\test01.1555094281.single.couch"
-			// filename = "c:\\Data\\uncouch\\test01.1555094281.multipleversions.couch"
-			// filename = "c:\\Data\\uncouch\\test01.1555094281.multipleversions.compacted.couch"
-			filename = "c:\\Data\\uncouch\\test01.1555094281.couch"
-			// filename = "c:\\Data\\uncouch\\books.1555177047.couch"
-			// filename = "c:\\Data\\uncouch\\activity.1555355987.couch"
-
-		case "darwin":
-			// filename = "/Users/tarmotali/Data/company_4318726.1553594378.couch"
-			// filename = "/Users/tarmotali/Data/activity.1555355987.couch"
-			filename = "/Users/tarmotali/Data/sandbox.1555783978.couch"
-		default:
-			slog.Panicf("Not implemented yet: %v\n", runtime.GOOS)
-		}
-	} else {
-		filename = args[0]
-	}
-	slog.Debug(filename)
-	f, err := os.Open(filename)
-	if err != nil {
-		slog.Errorf("Unable to open input file, error %s", err)
-		return err
-	}
-	defer f.Close()
-	fi, err := f.Stat()
-	if err != nil {
-		slog.Errorf("Could not obtain stat %s", err)
-		return err
-	}
-	cf, err := couchdbfile.New(f, fi.Size())
-	cf.Explore()
-	if err != nil {
-		slog.Error(err)
-		return err
-	}
-	log.Debug("Done Sandbox")
-	return nil
 }

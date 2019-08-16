@@ -354,6 +354,7 @@ func processSeqNode(cf *couchdbfile.CouchDbFile, offset int64, str *strings.Buil
 					return err
 				}
 			}
+			str.Grow(len(output.Bytes()))
 			str.Write(output.Bytes())
 			// fmt.Print(output.String())
 			leakybucket.PutBuffer(output)
