@@ -30,7 +30,7 @@ func ReadDbHeaderBytes(input io.ReadSeeker, offset int64) (*[]byte, error) {
 	}
 	buf, _, err := readAndSkip4K(input, offset+4+bytesSkipped, dataSize)
 	if err != nil {
-		slog.Error(err)
+		//slog.Error(err)
 		return nil, err
 	}
 	/*
@@ -55,12 +55,12 @@ func ReadDbHeaderBytes(input io.ReadSeeker, offset int64) (*[]byte, error) {
 func ReadNodeBytes(input io.ReadSeeker, offset int64) (*[]byte, error) {
 	dataSize, bytesSkipped, err := readUint32Skip4K(input, offset)
 	if err != nil {
-		slog.Error(err)
+		//slog.Error(err)
 		return nil, err
 	}
 	buf, _, err := readAndSkip4K(input, offset+4+bytesSkipped, dataSize)
 	if err != nil {
-		slog.Error(err)
+		//slog.Error(err)
 		return nil, err
 	}
 	return uncompressBuffer(buf)
@@ -83,7 +83,7 @@ func ReadDocumentBytes(input io.ReadSeeker, offset int64) (*[]byte, error) {
 	}
 	buf, _, err := readAndSkip4K(input, offset+4+bytesSkipped, dataSize+16)
 	if err != nil {
-		slog.Error(err)
+		//slog.Error(err)
 		return nil, err
 	}
 	/*
@@ -95,7 +95,7 @@ func ReadDocumentBytes(input io.ReadSeeker, offset int64) (*[]byte, error) {
 	docSlice := (*buf)[24 : docSize+24]
 	docBytes, err := uncompressBuffer(&docSlice)
 	if err != nil {
-		slog.Error(err)
+		//slog.Error(err)
 		return nil, err
 	}
 	return docBytes, nil
@@ -114,7 +114,7 @@ func uncompressBuffer(buf *[]byte) (*[]byte, error) {
 		// Uncompress and go
 		res, err := snappy.Decode(*destBuf, (*buf)[1:])
 		if err != nil {
-			slog.Error("Error decoding snappy", err)
+			//slog.Error("Error decoding snappy", err)
 			return nil, err
 		}
 		// Release compressed buffer
@@ -127,7 +127,7 @@ func uncompressBuffer(buf *[]byte) (*[]byte, error) {
 		if b == deflateSuffix {
 			// slog.Debug("Deflate compressed node")
 			err := fmt.Errorf("Deflate un-compression is not implemented yet")
-			slog.Error(err)
+			//slog.Error(err)
 			return nil, err
 		}
 		// slog.Debug("Uncompressed node")
@@ -135,7 +135,7 @@ func uncompressBuffer(buf *[]byte) (*[]byte, error) {
 		return &t, nil
 	default:
 		err := fmt.Errorf("Unknown block prefix %v", b)
-		slog.Error(err)
+		//slog.Error(err)
 		return nil, err
 	}
 }
@@ -165,7 +165,7 @@ func readAndSkip4K(input io.ReadSeeker, offset int64, dataSize uint32) (*[]byte,
 	_, err := input.Seek(offset, io.SeekStart)
 	if err != nil {
 		if err != io.EOF {
-			slog.Error("Error on seeking while reading buffer.", err)
+			//slog.Error("Error on seeking while reading buffer.", err)
 			return nil, 0, err
 		}
 	}
@@ -182,7 +182,7 @@ func readAndSkip4K(input io.ReadSeeker, offset int64, dataSize uint32) (*[]byte,
 	_, err = input.Read(*buf)
 	if err != nil {
 		if err != io.EOF {
-			slog.Error("Error reading buffer.", err)
+			//slog.Error("Error reading buffer.", err)
 			return nil, 0, err
 		}
 	}

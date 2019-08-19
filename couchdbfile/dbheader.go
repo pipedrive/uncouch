@@ -30,18 +30,18 @@ func (dbh *DbHeader) findHeader(input io.ReadSeeker, size int64) (offset int64, 
 		if latestBlockIndex < 0 {
 			// We reached beginning of the file and didn't find DB header block, something must be wrong
 			err = fmt.Errorf("Could not find DB Header block in the file")
-			slog.Error(err)
+			//slog.Error(err)
 			return -1, err
 		}
 		offset, err = input.Seek(latestBlockIndex*couchbytes.BlockAlignment, io.SeekStart)
 		if err != nil {
-			slog.Error(err)
+			//slog.Error(err)
 			return -1, err
 		}
 		var headerFlag uint8
 		err = binary.Read(input, binary.BigEndian, &headerFlag)
 		if err != nil {
-			slog.Error(err)
+			//slog.Error(err)
 			return -1, err
 		}
 		switch headerFlag {
@@ -52,7 +52,7 @@ func (dbh *DbHeader) findHeader(input io.ReadSeeker, size int64) (offset int64, 
 			return offset, err
 		default:
 			err := fmt.Errorf("Unknown DB Header starting byte %v", headerFlag)
-			slog.Error(err)
+			//slog.Error(err)
 			return -1, err
 		}
 	}
@@ -62,7 +62,7 @@ func (dbh *DbHeader) findHeader(input io.ReadSeeker, size int64) (offset int64, 
 func (dbh *DbHeader) readFromTermite(t *termite.Termite) error {
 	if string(t.Children[0].T.Binary) != "db_header" {
 		err := fmt.Errorf("Term header is \"%s\". Expecting \"db_header\"", string(t.Children[0].T.Binary))
-		slog.Error(err)
+		//slog.Error(err)
 		return err
 	}
 	dbh.DiskVersion = uint8(t.Children[1].T.IntegerValue)

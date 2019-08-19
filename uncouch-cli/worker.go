@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"errors"
 	"github.com/pipedrive/uncouch/couchdbfile"
 	"github.com/pipedrive/uncouch/tar"
 	"strconv"
@@ -10,6 +9,8 @@ import (
 )
 
 type muMap map [string]mapV
+
+type errMap map [string]error
 
 type mapV struct {
 	Mu *sync.Mutex
@@ -53,17 +54,17 @@ func (m muMap) Delete(f string, mapMutex *sync.Mutex) {
 
 }
 
-func createWorkers(workersQ uint, filesChan chan *tar.UntarredFile, dstFolder string, wgp *sync.WaitGroup, oksChan *[]string, errorsChan *[]error) (chan FileContent) {
+func createWorkers(workersQ uint, filesChan chan *tar.UntarredFile, dstFolder string, wgp *sync.WaitGroup, oksChan *[]string, errorsMap errMap) (chan FileContent) {
 	wgp.Add(int(workersQ))
 	writesChan := make(chan FileContent)
 	for i := uint(0); i < workersQ; i++ {
 		log.Info("Starting worker: " + strconv.Itoa(int(i)))
-		go worker(filesChan, writesChan, dstFolder, wgp, oksChan, errorsChan, i)
+		go worker(filesChan, writesChan, dstFolder, wgp, oksChan, errorsMap, i)
 	}
 	return writesChan
 }
 
-func worker(filesChan chan *tar.UntarredFile, writesChan chan FileContent, dstFolder string, wgp *sync.WaitGroup, oksChan *[]string, errorsChan *[]error, i uint) () {
+func worker(filesChan chan *tar.UntarredFile, writesChan chan FileContent, dstFolder string, wgp *sync.WaitGroup, oksChan *[]string, errorsMap errMap, i uint) () {
 	for {
 		current, more := <- filesChan
 		if !more {
@@ -83,12 +84,12 @@ func worker(filesChan chan *tar.UntarredFile, writesChan chan FileContent, dstFo
 		}
 
 		if err != nil {
-			*errorsChan = append(*errorsChan, err)
-			slog.Error(err)
-			continue
+			errorsMap[current.Filepath] = err
+			//slog.Error(err)
+		} else {
+			*oksChan = append(*oksChan, current.Filepath)
+			writesChan <- file
 		}
-		*oksChan = append(*oksChan, current.Filepath)
-		writesChan <- file
 	}
 }
 
@@ -99,8 +100,8 @@ func processAll(buf []byte, filename string, n int64, dstFolder string) (FileCon
 
 	cf, err := couchdbfile.New(memoryReader, n)
 	if err != nil {
-		slog.Error(errors.New("Error in file: " + filename))
-		slog.Error(err)
+		//slog.Error(errors.New("Error in file: " + filename))
+		//slog.Error(err)
 		return file, err
 	}
 
@@ -114,24 +115,24 @@ func processAll(buf []byte, filename string, n int64, dstFolder string) (FileCon
 func processFiles(filename, dstFolder string) (FileContent, error) {
 	file, err := auxDataFunc(filename, dstFolder)
 	if err != nil {
-		slog.Error(err)
+		//slog.Error(err)
 	}
 	return file, err
 }
 
-func createWriters(writersQ uint, writesChan chan FileContent, wgw *sync.WaitGroup, woksChan *[]string, werrorsChan *[]error) () {
+func createWriters(writersQ uint, writesChan chan FileContent, wgw *sync.WaitGroup, woksChan *[]string, werrorsMap errMap) () {
 	wgw.Add(int(writersQ))
 	m := make(muMap)
 	var mapMutex sync.Mutex
 
 	for i := uint(0); i < writersQ; i++ {
 		log.Info("Starting writer: " + strconv.Itoa(int(i)))
-		go writer(writesChan, wgw, woksChan, werrorsChan, i, m, &mapMutex)
+		go writer(writesChan, wgw, woksChan, werrorsMap, i, m, &mapMutex)
 	}
 	return
 }
 
-func writer(writesChan chan FileContent, wgw *sync.WaitGroup, woksChan *[]string, werrorsChan *[]error, i uint, m muMap, mMutex *sync.Mutex) () {
+func writer(writesChan chan FileContent, wgw *sync.WaitGroup, woksChan *[]string, werrorsMap errMap, i uint, m muMap, mMutex *sync.Mutex) () {
 	for {
 		current, more := <- writesChan
 		if !more {
@@ -139,19 +140,18 @@ func writer(writesChan chan FileContent, wgw *sync.WaitGroup, woksChan *[]string
 			wgw.Done()
 			return
 		}
-		log.Info("Writing file: " + current.Filename)
+		//log.Info("Writer " + strconv.Itoa(int(i)) + " - Writing file: " + current.Filename)
 
 		mu := m.Get(current.Filename, mMutex)
 		// actual processing
 		newFilename, err := current.mergeWriteData(mu)
 
 		if err != nil {
-			*werrorsChan = append(*werrorsChan, err)
-			slog.Error(err)
+			werrorsMap[current.Filename] = err
+			//slog.Error(err)
 		} else {
 			*woksChan = append(*woksChan, newFilename)
 		}
 		m.Delete(current.Filename, mMutex)
 	}
-	// fmt.Println("Finalizing writer: " + strconv.Itoa(i))
 }

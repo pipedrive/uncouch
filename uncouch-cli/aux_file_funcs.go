@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"github.com/pipedrive/uncouch/config"
 	"github.com/pipedrive/uncouch/couchdbfile"
@@ -21,15 +20,15 @@ func auxDataFunc(filename, dstFolder string) (FileContent, error) {
 
 	fileBytes, n, err := readInputFile(filename)
 	if err != nil {
-		slog.Error(err)
+		//slog.Error(err)
 		return file, err
 	}
 
 	memoryReader := bytes.NewReader(fileBytes)
 	cf, err := couchdbfile.New(memoryReader, n)
 	if err != nil {
-		slog.Error(errors.New("Error in file: " + filename))
-		slog.Error(err)
+		//slog.Error(errors.New("Error in file: " + filename))
+		//slog.Error(err)
 		return file, err
 	}
 
@@ -90,20 +89,20 @@ func createOutputFilenameWithIndex(filename string, index uint8) string {
 func readInputFile(filename string) ([]byte, int64, error) {
 	f, err := os.Open(filename)
 	if err != nil {
-		slog.Error(err)
+		//slog.Error(err)
 		return nil, 0, err
 	}
 	defer f.Close()
 
 	fi, err := f.Stat()
 	if err != nil {
-		slog.Error(err)
+		//slog.Error(err)
 		return nil, 0, err
 	}
 
 	fileBytes, err := ioutil.ReadAll(f)
 	if err != nil {
-		slog.Error(err)
+		//slog.Error(err)
 		return nil, 0, err
 	}
 	return fileBytes, fi.Size(), nil

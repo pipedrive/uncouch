@@ -12,9 +12,10 @@ ADD . /usr/local/go/src/github.com/pipedrive/uncouch
 WORKDIR /usr/local/go/src/github.com/pipedrive/uncouch/uncouch-cli/
 RUN go build -o uncouch-cli .
 
-FROM golang:alpine as stage2
+FROM scratch as stage2
 
 USER nobody
 COPY --from=stage1 /usr/local/go/src/github.com/pipedrive/uncouch/uncouch-cli/uncouch-cli /app/
 WORKDIR /app
-CMD ["./uncouch-cli"]
+
+ENTRYPOINT ["./uncouch-cli"]

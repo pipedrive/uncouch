@@ -29,10 +29,12 @@ func cmdUntarFunc(input, output, tmp_dir string, workersQ uint) error {
 	var filename string = input
 	var dstFolder string = output
 
+	log.Info("Started processing: " + filename)
+
 	writersQ := workersQ
 
-	if ! strings.HasSuffix(filename, ".tar.gz") {
-		err := errors.New("File is not .tar.gz")
+	if /*! strings.HasSuffix(filename, ".tar.gz") &&*/ ! strings.HasSuffix(filename, ".tar") {
+		err := errors.New("File is not .tar")
 		slog.Error(err)
 		return err
 	}
@@ -44,10 +46,10 @@ func cmdUntarFunc(input, output, tmp_dir string, workersQ uint) error {
 		untarDone := make(chan tar.Done)
 		var (
 			oksChan []string
-			errorsChan []error
 			woksChan []string
-			werrorsChan []error
 		)
+		errorsMap := make(errMap)
+	    werrorsMap := make(errMap)
 
 	f, err := os.Open(filename)
 	if err != nil {
@@ -59,14 +61,14 @@ func cmdUntarFunc(input, output, tmp_dir string, workersQ uint) error {
 
 	go tar.Untar(inputFolder, f, filesChan, untarDone)
 
-	writesChan := createWorkers(workersQ, filesChan, dstFolder, &wgp, &oksChan, &errorsChan)
-	createWriters(writersQ, writesChan, &wgw, &woksChan, &werrorsChan)
+	writesChan := createWorkers(workersQ, filesChan, dstFolder, &wgp, &oksChan, errorsMap)
+	createWriters(writersQ, writesChan, &wgw, &woksChan, werrorsMap)
 
 	d := <- untarDone
-	log.Info("untarDone")
+	log.Info("Untar process done.")
 	if !d.Res {
-		err := errors.New("Error while untarring file.")
-		slog.Error(err)
+		log.Info("Error while untarring file.")
+		slog.Error(d.Err)
 		return err
 	}
 	close(untarDone)
@@ -74,18 +76,19 @@ func cmdUntarFunc(input, output, tmp_dir string, workersQ uint) error {
 	wgp.Wait()
 	log.Info("File deserializing done.")
 	close(writesChan)
-	total := uint32(len(oksChan) + len(errorsChan))
+	total := uint32(len(oksChan) + len(errorsMap))
 	if total != d.FileQ {
-		errMessage := fmt.Sprintf("Expected files: %v. Processed: %v. Ok: %v. Errors: %v", d.FileQ, total, len(oksChan), len(errorsChan))
+		errMessage := fmt.Sprintf("Expected files: %v. Processed: %v. Ok: %v. Errors: %v", d.FileQ, total, len(oksChan), len(errorsMap))
 		err := errors.New(errMessage)
 		slog.Error(err)
 		return err
 	}
 
-	if len(errorsChan) > 0 {
+	if len(errorsMap) > 0 {
 		err := errors.New("Detected errors while processing files.")
 		slog.Error(err)
-		for _, err := range errorsChan {
+		for ff, err := range errorsMap {
+			log.Info("Error in file: " + ff)
 			slog.Error(err)
 		}
 		return err
@@ -93,9 +96,9 @@ func cmdUntarFunc(input, output, tmp_dir string, workersQ uint) error {
 
 	wgw.Wait()
 	log.Info("File writing done.")
-	total = uint32(len(woksChan) + len(werrorsChan))
+	total = uint32(len(woksChan) + len(werrorsMap))
 	if total != d.FileQ {
-		errMessage := fmt.Sprintf("Not enough files written. Expected: %v. Processed: %v. Ok: %v. Errors: %v", d.FileQ, total, len(woksChan), len(werrorsChan))
+		errMessage := fmt.Sprintf("Not enough files written. Expected: %v. Processed: %v. Ok: %v. Errors: %v", d.FileQ, total, len(woksChan), len(werrorsMap))
 		err := errors.New(errMessage)
 		slog.Error(err)
 		return err
@@ -105,15 +108,16 @@ func cmdUntarFunc(input, output, tmp_dir string, workersQ uint) error {
 		log.Info(fmt.Sprintf("Written data to file: %s", f))
 	}
 
-	if len(werrorsChan) > 0 {
+	if len(werrorsMap) > 0 {
 		err := errors.New("Detected errors while writing files.")
 		slog.Error(err)
-		for _, err := range werrorsChan {
+		for ff, err := range werrorsMap {
+			log.Info("Error writing file: " + ff)
 			slog.Error(err)
 		}
 		return err
 	}
-
+	log.Info("Finished processing: " + filename)
 	return err
 }
 
