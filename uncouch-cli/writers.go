@@ -335,6 +335,9 @@ func processSeqNode(cf *couchdbfile.CouchDbFile, offset int64, str *strings.Buil
 			slog.Error(err)
 			return err
 		}
+		if kpNode != nil && kvNode != nil {
+			log.Info("Empty Node.")
+		}
 		if kpNode != nil {
 			// Pointer node, dig deeper
 			for _, node := range kpNode.Pointers {

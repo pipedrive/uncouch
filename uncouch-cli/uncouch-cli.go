@@ -40,9 +40,10 @@ For many years people have printed back to the screen.`,
 		Short: "Uncompress .tar file with couch data and create files with processed JSON data in specified output folder.",
 		Long: "Options:\ninput: string - Location of the file to process.\noutput: string - Location of the folder for the output files.",
 		Args:  cobra.MinimumNArgs(1),
-		Run:  func(cmd *cobra.Command, args []string) {
+		RunE:  func(cmd *cobra.Command, args []string) (error){
 			inputFile := args[0]
-			cmdUntarFunc(inputFile, output_dir, tmp_dir, uint(workers_Q))
+			err := cmdUntarFunc(inputFile, output_dir, tmp_dir, uint(workers_Q))
+			return err
 		},
 	}
 

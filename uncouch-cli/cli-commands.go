@@ -26,10 +26,15 @@ func cmdDataFunc(cmd *cobra.Command, args []string) error {
 }
 
 func cmdUntarFunc(input, output, tmp_dir string, workersQ uint) error {
-	var filename string = input
-	var dstFolder string = output
+	filename := input
+	dstFolder := output
 
 	log.Info("Started processing: " + filename)
+
+	if _, err := os.Stat(dstFolder); os.IsNotExist(err) {
+		log.Info("Creating output directory.")
+		os.MkdirAll(dstFolder, os.ModeDir)
+	}
 
 	writersQ := workersQ
 
@@ -44,10 +49,8 @@ func cmdUntarFunc(input, output, tmp_dir string, workersQ uint) error {
 	// Open tar.gz file.
 		filesChan := make(chan *tar.UntarredFile)
 		untarDone := make(chan tar.Done)
-		var (
-			oksChan []string
-			woksChan []string
-		)
+		oksMap := make(okMap)
+		woksMap  := make(okMap)
 		errorsMap := make(errMap)
 	    werrorsMap := make(errMap)
 
@@ -61,12 +64,14 @@ func cmdUntarFunc(input, output, tmp_dir string, workersQ uint) error {
 
 	go tar.Untar(inputFolder, f, filesChan, untarDone)
 
-	writesChan := createWorkers(workersQ, filesChan, dstFolder, &wgp, &oksChan, errorsMap)
-	createWriters(writersQ, writesChan, &wgw, &woksChan, werrorsMap)
+	writesChan := createWorkers(workersQ, filesChan, dstFolder, &wgp, oksMap, errorsMap)
+	createWriters(writersQ, writesChan, &wgw, woksMap, werrorsMap)
 
 	d := <- untarDone
 	log.Info("Untar process done.")
 	if !d.Res {
+		close(untarDone)
+		close(writesChan)
 		log.Info("Error while untarring file.")
 		slog.Error(d.Err)
 		return err
@@ -76,9 +81,18 @@ func cmdUntarFunc(input, output, tmp_dir string, workersQ uint) error {
 	wgp.Wait()
 	log.Info("File deserializing done.")
 	close(writesChan)
-	total := uint32(len(oksChan) + len(errorsMap))
+	totalOks := uint32(0)
+	for _, x := range oksMap {
+		totalOks += uint32(x)
+	}
+
+	total := totalOks + uint32(len(errorsMap))
+
+	//for _, ff := range oksChan {
+	//	fmt.Println("Deserialized file: " + ff)
+	//}
 	if total != d.FileQ {
-		errMessage := fmt.Sprintf("Expected files: %v. Processed: %v. Ok: %v. Errors: %v", d.FileQ, total, len(oksChan), len(errorsMap))
+		errMessage := fmt.Sprintf("Expected files: %v. Processed: %v. Ok: %v. Errors: %v", d.FileQ, total, totalOks, len(errorsMap))
 		err := errors.New(errMessage)
 		slog.Error(err)
 		return err
@@ -96,16 +110,16 @@ func cmdUntarFunc(input, output, tmp_dir string, workersQ uint) error {
 
 	wgw.Wait()
 	log.Info("File writing done.")
-	total = uint32(len(woksChan) + len(werrorsMap))
+	totalOks = 0
+	for _, x := range oksMap {
+		totalOks += uint32(x)
+	}
+	total = totalOks + uint32(len(werrorsMap))
 	if total != d.FileQ {
-		errMessage := fmt.Sprintf("Not enough files written. Expected: %v. Processed: %v. Ok: %v. Errors: %v", d.FileQ, total, len(woksChan), len(werrorsMap))
+		errMessage := fmt.Sprintf("Not enough files written. Expected: %v. Processed: %v. Ok: %v. Errors: %v", d.FileQ, total, totalOks, len(werrorsMap))
 		err := errors.New(errMessage)
 		slog.Error(err)
 		return err
-	}
-
-	for _, f := range woksChan {
-		log.Info(fmt.Sprintf("Written data to file: %s", f))
 	}
 
 	if len(werrorsMap) > 0 {
