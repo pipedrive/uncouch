@@ -50,7 +50,7 @@ For many years people have printed back to the screen.`,
 	cmdUntar.Flags().StringVarP(&output_dir, "dest", "d", "", "Folder for output files (required).")
 	cmdUntar.Flags().StringVarP(&tmp_dir, "temp", "t", "", "Folder to store untarred files.")
 	cmdUntar.Flags().IntVarP(&workers_Q, "workers", "w", 10, "Number of parallel workers (default 10).")
-	cmdUntar.MarkFlagRequired("destination")
+	cmdUntar.MarkFlagRequired("dest")
 
 	cmdHeaders := &cobra.Command{
 		Use:   "headers filename path",
