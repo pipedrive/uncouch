@@ -20,23 +20,23 @@ func (cf *CouchDbFile) ReadIDNode(offset int64) (*KpNodeID, *KvNode, error) {
 	// slog.Debugf("Starting readNode with offset %d", offset)
 	buf, err := couchbytes.ReadNodeBytes(cf.input, offset)
 	if err != nil {
-		slog.Error(err)
+		//slog.Error(err)
 		return nil, nil, err
 	}
 	defer leakybucket.PutBytes(buf)
 	s, err := erldeser.NewScanner(*buf)
 	if err != nil {
-		slog.Error(err)
+		//slog.Error(err)
 		return nil, nil, err
 	}
 	tb, err := termite.NewBuilder()
 	if err != nil {
-		slog.Error(err)
+		//slog.Error(err)
 		return nil, nil, err
 	}
 	t, err := tb.ReadTermite(s)
 	if err != nil {
-		slog.Error(err)
+		//slog.Error(err)
 		return nil, nil, err
 	}
 	// Switch
@@ -45,7 +45,7 @@ func (cf *CouchDbFile) ReadIDNode(offset int64) (*KpNodeID, *KvNode, error) {
 		var kpNode KpNodeID
 		err = kpNode.readFromTermite(t)
 		if err != nil {
-			slog.Error(err)
+			//slog.Error(err)
 			return nil, nil, err
 		}
 		t.Release()
@@ -54,14 +54,14 @@ func (cf *CouchDbFile) ReadIDNode(offset int64) (*KpNodeID, *KvNode, error) {
 		var kvNode KvNode
 		err = kvNode.readFromTermite(t)
 		if err != nil {
-			slog.Error(err)
+			//slog.Error(err)
 			return nil, nil, err
 		}
 		t.Release()
 		return nil, &kvNode, nil
 	default:
 		err := fmt.Errorf("Unknown node type: %v", string(t.Children[0].T.Binary))
-		slog.Error(err)
+		//slog.Error(err)
 		return nil, nil, err
 	}
 }
@@ -69,6 +69,10 @@ func (cf *CouchDbFile) ReadIDNode(offset int64) (*KpNodeID, *KvNode, error) {
 // ReadSeqNode reads Sequence Btree node from the given offset
 func (cf *CouchDbFile) ReadSeqNode(offset int64) (*KpNodeSeq, *KvNode, error) {
 	// slog.Debugf("Starting readNode with offset %d", offset)
+	if offset == 0 {
+		return nil, nil, nil
+	}
+
 	buf, err := couchbytes.ReadNodeBytes(cf.input, offset)
 	if err != nil {
 		slog.Error(err)
@@ -121,33 +125,34 @@ func (cf *CouchDbFile) ReadSeqNode(offset int64) (*KpNodeSeq, *KvNode, error) {
 func (cf *CouchDbFile) ReadDbHeader() (*DbHeader, error) {
 	offset, err := cf.Header.findHeader(cf.input, cf.size)
 	if err != nil {
-		slog.Error(err)
+		//slog.Error(err)
 		return nil, err
 	}
 	buf, err := couchbytes.ReadDbHeaderBytes(cf.input, offset)
 	if err != nil {
-		slog.Error(err)
+		//slog.Error(err)
 		return nil, err
 	}
 	defer leakybucket.PutBytes(buf)
 	s, err := erldeser.NewScanner(*buf)
 	if err != nil {
-		slog.Error(err)
+		//slog.Error(err)
 		return nil, err
 	}
 	tb, err := termite.NewBuilder()
 	if err != nil {
-		slog.Error(err)
+		//slog.Error(err)
 		return nil, err
 	}
 	t, err := tb.ReadTermite(s)
 	if err != nil {
-		slog.Error(err)
+		//slog.Error(err)
 		return nil, err
 	}
 	// slog.Debugf("%+v", t)
 	var header DbHeader
-	header.readFromTermite(t)
+	err = header.readFromTermite(t)
+
 	t.Release()
-	return &header, nil
+	return &header, err
 }

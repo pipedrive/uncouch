@@ -235,6 +235,12 @@ func (js *JSONSer) readJSONValue(collector *bytes.Buffer) error {
 			slog.Error(err)
 			return err
 		}
+	case erldeser.SmallBigExt:
+		_, err := collector.WriteString(strconv.FormatInt(int64(t.IntegerValue), 10))
+		if err != nil {
+			slog.Error(err)
+			return err
+		}
 	case erldeser.ListExt:
 		_, err := collector.WriteString("[")
 		if err != nil {

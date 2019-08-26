@@ -2,39 +2,137 @@ package main
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
+	"github.com/pipedrive/uncouch/couchdbfile"
+	"github.com/pipedrive/uncouch/tar"
+	"github.com/spf13/cobra"
 	"io/ioutil"
 	"os"
-	"runtime"
-
-	"github.com/pipedrive/uncouch/couchdbfile"
-	"github.com/spf13/cobra"
+	"strings"
+	"sync"
 )
 
 func cmdDataFunc(cmd *cobra.Command, args []string) error {
 	filename := args[0]
+
+	fc, err := auxDataFunc(filename, "")
+	if err != nil {
+		slog.Error(err)
+		return err
+	}
+
+	return writeData(fc.Cf, fc.Filename)
+}
+
+func cmdUntarFunc(input, output, tmp_dir string, workersQ uint) error {
+	filename := input
+	dstFolder := output
+
+	log.Info("Started processing: " + filename)
+
+	if _, err := os.Stat(dstFolder); os.IsNotExist(err) {
+		log.Info("Creating output directory.")
+		os.MkdirAll(dstFolder, os.ModeDir)
+	}
+
+	writersQ := workersQ
+
+	if /*! strings.HasSuffix(filename, ".tar.gz") &&*/ ! strings.HasSuffix(filename, ".tar") {
+		err := errors.New("File is not .tar")
+		slog.Error(err)
+		return err
+	}
+
+	var wgp, wgw sync.WaitGroup
+
+	// Open tar.gz file.
+		filesChan := make(chan *tar.UntarredFile)
+		untarDone := make(chan tar.Done)
+		oksMap := make(okMap)
+		woksMap  := make(okMap)
+		errorsMap := make(errMap)
+	    werrorsMap := make(errMap)
+
 	f, err := os.Open(filename)
 	if err != nil {
 		slog.Error(err)
 		return err
 	}
-	defer f.Close()
-	fi, err := f.Stat()
-	if err != nil {
+
+	inputFolder := tmp_dir
+
+	go tar.Untar(inputFolder, f, filesChan, untarDone)
+
+	writesChan := createWorkers(workersQ, filesChan, dstFolder, &wgp, oksMap, errorsMap)
+	createWriters(writersQ, writesChan, &wgw, woksMap, werrorsMap)
+
+	d := <- untarDone
+	log.Info("Untar process done.")
+	if !d.Res {
+		close(untarDone)
+		close(writesChan)
+		log.Info("Error while untarring file.")
+		slog.Error(d.Err)
+		return err
+	}
+	close(untarDone)
+
+	wgp.Wait()
+	log.Info("File deserializing done.")
+	close(writesChan)
+	totalOks := uint32(0)
+	for _, x := range oksMap {
+		totalOks += uint32(x)
+	}
+
+	total := totalOks + uint32(len(errorsMap))
+
+	//for _, ff := range oksChan {
+	//	fmt.Println("Deserialized file: " + ff)
+	//}
+	if total != d.FileQ {
+		errMessage := fmt.Sprintf("Expected files: %v. Processed: %v. Ok: %v. Errors: %v", d.FileQ, total, totalOks, len(errorsMap))
+		err := errors.New(errMessage)
 		slog.Error(err)
 		return err
 	}
-	fileBytes, err := ioutil.ReadAll(f)
-	if err != nil {
+
+	if len(errorsMap) > 0 {
+		err := errors.New("Detected errors while processing files.")
+		slog.Error(err)
+		for ff, err := range errorsMap {
+			log.Info("Error in file: " + ff)
+			slog.Error(err)
+		}
+		return err
+	}
+
+	wgw.Wait()
+	log.Info("File writing done.")
+	totalOks = 0
+	for _, x := range oksMap {
+		totalOks += uint32(x)
+	}
+	total = totalOks + uint32(len(werrorsMap))
+	if total != d.FileQ {
+		errMessage := fmt.Sprintf("Not enough files written. Expected: %v. Processed: %v. Ok: %v. Errors: %v", d.FileQ, total, totalOks, len(werrorsMap))
+		err := errors.New(errMessage)
 		slog.Error(err)
 		return err
 	}
-	memoryReader := bytes.NewReader(fileBytes)
-	cf, err := couchdbfile.New(memoryReader, fi.Size())
-	if err != nil {
+
+	if len(werrorsMap) > 0 {
+		err := errors.New("Detected errors while writing files.")
 		slog.Error(err)
+		for ff, err := range werrorsMap {
+			log.Info("Error writing file: " + ff)
+			slog.Error(err)
+		}
 		return err
 	}
-	return writeData(cf)
+	log.Info("Finished processing: " + filename)
+	return err
 }
 
 func cmdHeadersFunc(cmd *cobra.Command, args []string) error {
@@ -68,51 +166,4 @@ func cmdHeadersFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	return writeHeaders(cf, outputdir)
-}
-
-func cmdSandboxFunc(cmd *cobra.Command, args []string) error {
-	slog.Debug("Starting Sandbox ...")
-	var filename string
-	if len(args) == 0 {
-		switch runtime.GOOS {
-		case "windows":
-			// filename = "c:\\Data\\uncouch\\sandbox.1553883929.couch"
-			// filename = "c:\\Data\\uncouch\\test01.1555094281.empty.couch"
-			// filename = "c:\\Data\\uncouch\\test01.1555094281.single.couch"
-			// filename = "c:\\Data\\uncouch\\test01.1555094281.multipleversions.couch"
-			// filename = "c:\\Data\\uncouch\\test01.1555094281.multipleversions.compacted.couch"
-			filename = "c:\\Data\\uncouch\\test01.1555094281.couch"
-			// filename = "c:\\Data\\uncouch\\books.1555177047.couch"
-			// filename = "c:\\Data\\uncouch\\activity.1555355987.couch"
-
-		case "darwin":
-			// filename = "/Users/tarmotali/Data/company_4318726.1553594378.couch"
-			// filename = "/Users/tarmotali/Data/activity.1555355987.couch"
-			filename = "/Users/tarmotali/Data/sandbox.1555783978.couch"
-		default:
-			slog.Panicf("Not implemented yet: %v\n", runtime.GOOS)
-		}
-	} else {
-		filename = args[0]
-	}
-	slog.Debug(filename)
-	f, err := os.Open(filename)
-	if err != nil {
-		slog.Errorf("Unable to open input file, error %s", err)
-		return err
-	}
-	defer f.Close()
-	fi, err := f.Stat()
-	if err != nil {
-		slog.Errorf("Could not obtain stat %s", err)
-		return err
-	}
-	cf, err := couchdbfile.New(f, fi.Size())
-	cf.Explore()
-	if err != nil {
-		slog.Error(err)
-		return err
-	}
-	log.Debug("Done Sandbox")
-	return nil
 }

@@ -1,6 +1,8 @@
 .DS_Store
 # Ignore dev binary
 uncouch
+/uncouch-cli/uncouch-cli
+
 # Binaries for programs and plugins
 *.exe
 *.exe~
@@ -13,4 +15,6 @@ uncouch
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
- 
+
+# config file
+/config/values.go

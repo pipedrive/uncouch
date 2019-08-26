@@ -64,6 +64,7 @@ func (b *Builder) buildTermite(buildNode *Termite) error {
 	case erldeser.NilExt:
 	case erldeser.StringExt:
 	case erldeser.BinaryExt:
+	case erldeser.SmallBigExt:
 	case erldeser.SmallTupleExt:
 		children := make([]*Termite, 0, 5)
 		buildNode.Children = children
