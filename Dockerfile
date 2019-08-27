@@ -10,7 +10,7 @@ RUN set -ex \
 RUN mkdir -p /usr/local/go/src/github.com/pipedrive/uncouch
 ADD . /usr/local/go/src/github.com/pipedrive/uncouch
 WORKDIR /usr/local/go/src/github.com/pipedrive/uncouch/uncouch-cli/
-RUN go build -o uncouch-cli .
+RUN GOOS=linux GOARCH=arm go build -o uncouch-cli .
 
 FROM scratch as stage2
 
