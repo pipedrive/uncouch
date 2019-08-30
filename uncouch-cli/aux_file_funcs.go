@@ -64,17 +64,18 @@ func createOutputFilename(filename, dstFolder string) string {
 		newExt = ts + ".json"
 	}
 
-
 	u.Path = strings.Replace(temp, fileExt, newExt, 1)
 
 	return u.String()
 }
 
-func createOutputFilenameWithIndex(filename string, index uint8) string {
-	s      := "00" + strconv.Itoa(int(index))
+func createOutputFilenameWithIndex(filename string, index int) string {
+	s := "00" + strconv.Itoa(int(index))
 
-	var (newExt string
-		fileExt string)
+	var (
+		newExt  string
+		fileExt string
+	)
 	if config.COMPRESS_OUTPUT {
 		fileExt = ".json.gz"
 		newExt = "_" + s[len(s)-2:] + ".json.gz"
