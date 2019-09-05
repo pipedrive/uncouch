@@ -24,26 +24,30 @@ type Done struct {
 }
 
 func Untar(inputFile string, filesChan chan *UntarredFile, tmpDir string) {
+	defer close(filesChan)
+
 	log.Info("Starting untar process.")
 	fileQ := uint32(0)
 
-	r, err := os.Open(inputFile)
+	f, err := os.Open(inputFile)
 	if err != nil {
 		slog.Error(err)
-		return
+		panic(err)
 	}
-	defer r.Close()
-	defer close(filesChan)
+	defer f.Close()
 
-	//if path.Ext(inputFile) == "gz" {
-	//	r, err = gzip.NewReader(r)
-	//	if err != nil {
-	//		slog.Error(err)
-	//		return
-	//	}
-	//}
+	var gzf io.Reader
+	if path.Ext(inputFile) == ".gz" {
+		gzf, err = gzip.NewReader(f)
+		if err != nil {
+			slog.Error(err)
+			return
+		}
+	} else {
+		gzf = f
+	}
 
-	tr := tar.NewReader(r)
+	tr := tar.NewReader(gzf)
 
 	writeLocalFile := tmpDir != ""
 	if writeLocalFile {

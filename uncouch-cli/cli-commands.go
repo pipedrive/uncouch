@@ -54,7 +54,7 @@ func cmdUntarFunc(inputFile, outputDir, tmpDir string, workersQ uint) error {
 	i := 0
 	lineNum := 0
 
-	outputBaseFilename := path.Join(outputDir, TrimSuffix(path.Base(inputFile), ".tar")+".json.gz")
+	outputBaseFilename := path.Join(outputDir, TrimSuffix(TrimSuffix(path.Base(inputFile), ".gz"), ".tar")+".json.gz")
 	outputFilename := createOutputFilenameWithIndex(outputBaseFilename, i)
 	outputFile, err := CreateGzipFile(outputFilename)
 	if err != nil {
