@@ -26,12 +26,8 @@ type FileCompressor struct {
 func CreateGzipFile(name string) (f FileCompressor, err error) {
 	fi, err := os.Create(name)
 	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	if err != nil {
 		slog.Error(err)
-		return f, err
+		panic(err)
 	}
 	gf := gzip.NewWriter(fi)
 	fw := bufio.NewWriter(gf)
