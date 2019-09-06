@@ -13,37 +13,47 @@ import (
 
 type UntarredFile struct {
 	Filepath string
-	Input []byte
-	Size int64
+	Input    []byte
+	Size     int64
 }
 
 type Done struct {
-	Res bool
-	Err error
+	Res   bool
+	Err   error
 	FileQ uint32
 }
 
-func Untar(dst string, r io.Reader, filesChan chan *UntarredFile, done chan Done) () {
+func Untar(inputFile string, filesChan chan *UntarredFile, tmpDir string) {
+	defer close(filesChan)
 
 	log.Info("Starting untar process.")
 	fileQ := uint32(0)
-/*	gzr, err := gzip.NewReader(r)
+
+	f, err := os.Open(inputFile)
 	if err != nil {
 		slog.Error(err)
-		done <- Done{Res:false, FileQ:fileQ}
-		return
+		panic(err)
 	}
-	defer gzr.Close()*/
+	defer f.Close()
 
-	tr := tar.NewReader(r)
+	var gzf io.Reader
+	if path.Ext(inputFile) == ".gz" {
+		gzf, err = gzip.NewReader(f)
+		if err != nil {
+			slog.Error(err)
+			return
+		}
+	} else {
+		gzf = f
+	}
 
-	writeLocalFile := dst != ""
+	tr := tar.NewReader(gzf)
 
+	writeLocalFile := tmpDir != ""
 	if writeLocalFile {
-		if _, err := os.Stat(dst); err != nil {
-			if err := os.MkdirAll(dst, 0755); err != nil {
+		if _, err := os.Stat(tmpDir); err != nil {
+			if err := os.MkdirAll(tmpDir, 0755); err != nil {
 				slog.Error(err)
-				done <- Done{Res: false, Err: err, FileQ: fileQ}
 				return
 			}
 		}
@@ -56,15 +66,11 @@ func Untar(dst string, r io.Reader, filesChan chan *UntarredFile, done chan Done
 
 		// if no more files are found return
 		case err == io.EOF:
-			close(filesChan)
-			done <- Done{Res:true, Err: nil, FileQ:fileQ}
 			return
 
 		// return any other error
 		case err != nil:
-			slog.Error(err)
-			done <- Done{Res:false, Err: err, FileQ:fileQ}
-			return
+			panic(err)
 
 		// if the header is nil, just skip it.
 		case header == nil:
@@ -72,7 +78,7 @@ func Untar(dst string, r io.Reader, filesChan chan *UntarredFile, done chan Done
 		}
 
 		// the target location where the dir/file should be created
-		target := filepath.Join(dst, header.Name)
+		target := filepath.Join(tmpDir, header.Name)
 
 		// check the file type
 		switch header.Typeflag {
@@ -82,17 +88,16 @@ func Untar(dst string, r io.Reader, filesChan chan *UntarredFile, done chan Done
 			if writeLocalFile {
 				if _, err := os.Stat(target); err != nil {
 					if err := os.MkdirAll(target, 0755); err != nil {
-						//slog.Error(err)
-						done <- Done{Res:false, Err: err, FileQ:fileQ}
+						slog.Error(err)
 						return
 					}
 				}
 			}
-			continue
 
 		// if it's a file create it
 		case tar.TypeReg:
-			if !strings.HasSuffix(header.Name, ".couch") && !strings.HasSuffix(header.Name, ".couch.gz") {
+			if !strings.HasSuffix(header.Name, ".couch") &&
+				!strings.HasSuffix(header.Name, ".couch.gz") {
 				continue
 			}
 			_, ff := path.Split(header.Name)
@@ -107,8 +112,7 @@ func Untar(dst string, r io.Reader, filesChan chan *UntarredFile, done chan Done
 			// Separate if logic.
 			f, err := writeToDest(writeLocalFile, target, tr, header)
 			if err != nil {
-				//slog.Error(err)
-				done <- Done{Res:false, Err: err, FileQ:fileQ}
+				slog.Error(err)
 				return
 			}
 
@@ -118,18 +122,13 @@ func Untar(dst string, r io.Reader, filesChan chan *UntarredFile, done chan Done
 			}
 
 			fileQ++
-
 			filesChan <- f
-			//fmt.Println("Untarred file: " + header.Name)
-
 		}
 	}
 }
 
-
-
-func replaceGz(target string) (string) {
-	return strings.Replace(target,".couch.gz", ".couch", 1)
+func replaceGz(target string) string {
+	return strings.Replace(target, ".couch.gz", ".couch", 1)
 }
 
 func writeToDest(writeLocalFile bool, target string, tr *tar.Reader, header *tar.Header) (*UntarredFile, error) {

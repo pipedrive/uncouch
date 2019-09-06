@@ -3,14 +3,15 @@ package main
 import (
 	"bytes"
 	"errors"
-	"fmt"
+	"github.com/pipedrive/uncouch/config"
 	"github.com/pipedrive/uncouch/couchdbfile"
 	"github.com/pipedrive/uncouch/tar"
 	"github.com/spf13/cobra"
 	"io/ioutil"
 	"os"
+	"path"
+	"strconv"
 	"strings"
-	"sync"
 )
 
 func cmdDataFunc(cmd *cobra.Command, args []string) error {
@@ -25,114 +26,94 @@ func cmdDataFunc(cmd *cobra.Command, args []string) error {
 	return writeData(fc.Cf, fc.Filename)
 }
 
-func cmdUntarFunc(input, output, tmp_dir string, workersQ uint) error {
-	filename := input
-	dstFolder := output
+func cmdUntarFunc(inputFile, outputDir, tmpDir string, workersQ uint) error {
+	log.Info("Started processing: " + inputFile)
 
-	log.Info("Started processing: " + filename)
-
-	if _, err := os.Stat(dstFolder); os.IsNotExist(err) {
+	if _, err := os.Stat(outputDir); os.IsNotExist(err) {
 		log.Info("Creating output directory.")
-		os.MkdirAll(dstFolder, os.ModeDir)
+		os.MkdirAll(outputDir, os.ModeDir)
 	}
 
-	writersQ := workersQ
-
-	if /*! strings.HasSuffix(filename, ".tar.gz") &&*/ ! strings.HasSuffix(filename, ".tar") {
-		err := errors.New("File is not .tar")
+	if !strings.HasSuffix(inputFile, ".tar.gz") && !strings.HasSuffix(inputFile, ".tar") {
+		err := errors.New("File is not .tar or .tar.gz archive")
 		slog.Error(err)
 		return err
 	}
 
-	var wgp, wgw sync.WaitGroup
+	filesChan := make(chan *tar.UntarredFile, 100)
+	jsonChan := make(chan []byte, 1000)
 
-	// Open tar.gz file.
-		filesChan := make(chan *tar.UntarredFile)
-		untarDone := make(chan tar.Done)
-		oksMap := make(okMap)
-		woksMap  := make(okMap)
-		errorsMap := make(errMap)
-	    werrorsMap := make(errMap)
+	// Untar file and write contents to filesChan
+	// channel is closed when there are no more files left
+	go tar.Untar(inputFile, filesChan, tmpDir)
 
-	f, err := os.Open(filename)
+	// Create workers to parse couch files into JSON lines and write them to jsonChan
+	// channel is closed when all couch files are processed
+	go createWorkers(filesChan, jsonChan, workersQ)
+
+	i := 0
+	lineNum := 0
+
+	outputBaseFilename := path.Join(outputDir, TrimSuffix(TrimSuffix(path.Base(inputFile), ".gz"), ".tar")+".json.gz")
+	outputFilename := createOutputFilenameWithIndex(outputBaseFilename, i)
+	outputFile, err := CreateGzipFile(outputFilename)
 	if err != nil {
 		slog.Error(err)
-		return err
 	}
 
-	inputFolder := tmp_dir
-
-	go tar.Untar(inputFolder, f, filesChan, untarDone)
-
-	writesChan := createWorkers(workersQ, filesChan, dstFolder, &wgp, oksMap, errorsMap)
-	createWriters(writersQ, writesChan, &wgw, woksMap, werrorsMap)
-
-	d := <- untarDone
-	log.Info("Untar process done.")
-	if !d.Res {
-		close(untarDone)
-		close(writesChan)
-		log.Info("Error while untarring file.")
-		slog.Error(d.Err)
-		return err
-	}
-	close(untarDone)
-
-	wgp.Wait()
-	log.Info("File deserializing done.")
-	close(writesChan)
-	totalOks := uint32(0)
-	for _, x := range oksMap {
-		totalOks += uint32(x)
-	}
-
-	total := totalOks + uint32(len(errorsMap))
-
-	//for _, ff := range oksChan {
-	//	fmt.Println("Deserialized file: " + ff)
-	//}
-	if total != d.FileQ {
-		errMessage := fmt.Sprintf("Expected files: %v. Processed: %v. Ok: %v. Errors: %v", d.FileQ, total, totalOks, len(errorsMap))
-		err := errors.New(errMessage)
-		slog.Error(err)
-		return err
-	}
-
-	if len(errorsMap) > 0 {
-		err := errors.New("Detected errors while processing files.")
-		slog.Error(err)
-		for ff, err := range errorsMap {
-			log.Info("Error in file: " + ff)
+	for jsonLine := range jsonChan {
+		_, err := (outputFile.fw).Write(jsonLine)
+		if err != nil {
 			slog.Error(err)
 		}
-		return err
-	}
-
-	wgw.Wait()
-	log.Info("File writing done.")
-	totalOks = 0
-	for _, x := range oksMap {
-		totalOks += uint32(x)
-	}
-	total = totalOks + uint32(len(werrorsMap))
-	if total != d.FileQ {
-		errMessage := fmt.Sprintf("Not enough files written. Expected: %v. Processed: %v. Ok: %v. Errors: %v", d.FileQ, total, totalOks, len(werrorsMap))
-		err := errors.New(errMessage)
-		slog.Error(err)
-		return err
-	}
-
-	if len(werrorsMap) > 0 {
-		err := errors.New("Detected errors while writing files.")
-		slog.Error(err)
-		for ff, err := range werrorsMap {
-			log.Info("Error writing file: " + ff)
+		err = (outputFile.fw).WriteByte('\n')
+		if err != nil {
 			slog.Error(err)
 		}
-		return err
+
+		lineNum++
+		if lineNum%10000 == 0 {
+			s, err := outputFile.f.Stat()
+			if err != nil {
+				slog.Error(err)
+			}
+			if s.Size() >= config.FILE_SIZE {
+				flush(outputFile)
+				outputFile.gf.Close()
+				outputFile.f.Close()
+				i++
+				outputFilename := createOutputFilenameWithIndex(outputBaseFilename, i)
+				outputFile, err = CreateGzipFile(outputFilename)
+				if err != nil {
+					slog.Error(err)
+				}
+			}
+		}
 	}
-	log.Info("Finished processing: " + filename)
+	flush(outputFile)
+	outputFile.gf.Close()
+	outputFile.f.Close()
+	log.Info("Finished processing: " + inputFile)
+	log.Info("Lines: " + strconv.Itoa(lineNum))
 	return err
+}
+
+func flush(outputFile FileCompressor) {
+	err := outputFile.fw.Flush()
+	if err != nil {
+		slog.Error(err)
+	}
+	err = outputFile.gf.Flush()
+	if err != nil {
+		slog.Error(err)
+	}
+}
+
+func TrimSuffix(s, suffix string) string {
+	if strings.HasSuffix(s, suffix) {
+		s = s[:len(s)-len(suffix)]
+	}
+	return s
 }
 
 func cmdHeadersFunc(cmd *cobra.Command, args []string) error {

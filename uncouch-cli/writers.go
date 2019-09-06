@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"compress/gzip"
-	"errors"
 	"fmt"
 	"github.com/pipedrive/uncouch/config"
 	"github.com/pipedrive/uncouch/couchdbfile"
@@ -11,11 +10,10 @@ import (
 	"os"
 	"path"
 	"strings"
-	"sync"
 )
 
 type FileContent struct {
-	Cf *couchdbfile.CouchDbFile
+	Cf       *couchdbfile.CouchDbFile
 	Filename string
 }
 
@@ -25,11 +23,11 @@ type FileCompressor struct {
 	fw *bufio.Writer
 }
 
-func CreateGzipFile(s string) (f FileCompressor, err error) {
-	fi, err := os.OpenFile(s, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0660)
+func CreateGzipFile(name string) (f FileCompressor, err error) {
+	fi, err := os.Create(name)
 	if err != nil {
 		slog.Error(err)
-		return f, err
+		panic(err)
 	}
 	gf := gzip.NewWriter(fi)
 	fw := bufio.NewWriter(gf)
@@ -37,7 +35,7 @@ func CreateGzipFile(s string) (f FileCompressor, err error) {
 	return f, err
 }
 
-func WriteGzipFile(f FileCompressor, str *strings.Builder) (error) {
+func WriteGzipFile(f FileCompressor, str *strings.Builder) error {
 	_, err := (f.fw).WriteString(str.String())
 	if err != nil {
 		slog.Error(err)
@@ -45,7 +43,7 @@ func WriteGzipFile(f FileCompressor, str *strings.Builder) (error) {
 	return err
 }
 
-func CloseGzipFile(f FileCompressor) (error) {
+func CloseGzipFile(f FileCompressor) error {
 	err := f.fw.Flush()
 	if err != nil {
 		slog.Error(err)
@@ -67,67 +65,7 @@ func CloseGzipFile(f FileCompressor) (error) {
 	return err
 }
 
-func (f FileContent) mergeWriteData(mu *sync.Mutex) (string, error) {
-
-	str := leakybucket.GetStrBuilder()
-
-	err := processSeqNode(f.Cf, f.Cf.Header.SeqTreeState.Offset, str)
-	if err != nil {
-		slog.Error("Error in file:" + f.Filename)
-		slog.Error(err)
-		return "", err
-	}
-
-	mu.Lock()
-	defer mu.Unlock()
-
-	newFilename, err := fileMerger(str, f.Filename)
-	if err != nil {
-		slog.Error(err)
-	}
-
-	leakybucket.PutStrBuilder(str)
-	return newFilename, err
-}
-
-func fileMerger(str *strings.Builder, filename string) (string, error) {
-
-	var newFilename string
-	i := uint8(0)
-	for {
-		newFilename = createOutputFilenameWithIndex(filename, i)
-		if newFilename == "" {
-			err := errors.New("Could not create output filename.")
-			slog.Error(err)
-			return "", err
-		}
-
-		if fi, err := os.Stat(newFilename); err == nil {
-			if fi.Size() >= config.FILE_SIZE {
-				i++
-				continue
-			} else {
-				break
-			}
-		} else if os.IsNotExist(err) {
-			break
-		} else {
-			slog.Error(err)
-			return "", err
-		}
-		i++
-	}
-	var err error
-	if config.COMPRESS_OUTPUT {
-		err = gzipFileWriter(str, newFilename)
-	} else {
-		err = fileWriter(str, newFilename)
-	}
-
-	return newFilename, err
-}
-
-func gzipFileWriter(str *strings.Builder, filename string) (error) {
+func gzipFileWriter(str *strings.Builder, filename string) error {
 	f, err := CreateGzipFile(filename)
 	if err != nil {
 		slog.Error(err)
@@ -148,7 +86,7 @@ func gzipFileWriter(str *strings.Builder, filename string) (error) {
 	return err
 }
 
-func fileWriter(str *strings.Builder, filename string) (error) {
+func fileWriter(str *strings.Builder, filename string) error {
 	f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		slog.Error(err)

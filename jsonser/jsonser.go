@@ -275,17 +275,7 @@ func (js *JSONSer) readJSONValue(collector *bytes.Buffer) error {
 			return err
 		}
 	case erldeser.BinaryExt:
-		_, err := collector.WriteString("\"")
-		if err != nil {
-			slog.Error(err)
-			return err
-		}
-		_, err = collector.Write(t.Binary)
-		if err != nil {
-			slog.Error(err)
-			return err
-		}
-		_, err = collector.WriteString("\"")
+		_, err := collector.WriteString(strconv.Quote(string(t.Binary)))
 		if err != nil {
 			slog.Error(err)
 			return err
