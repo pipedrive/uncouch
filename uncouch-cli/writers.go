@@ -87,7 +87,7 @@ func gzipFileWriter(str *strings.Builder, filename string) error {
 }
 
 func fileWriter(str *strings.Builder, filename string) error {
-	f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.Create(filename)
 	if err != nil {
 		slog.Error(err)
 		return err

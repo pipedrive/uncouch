@@ -28,10 +28,13 @@ func (cf *CouchDbFile) WriteDocument(di *DocumentInfo, output *bytes.Buffer) err
 		slog.Error(err)
 		return err
 	}
-	err = js.WriteJSONToBuffer(output)
+	err = js.WriteJSONToBuffer(output, jsonser.JSONSerExtraAttrs{
+		ID: di.ID,
+	})
 	if err != nil {
 		slog.Error(err)
 		return err
 	}
+
 	return nil
 }

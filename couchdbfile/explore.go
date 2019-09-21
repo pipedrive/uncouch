@@ -65,7 +65,7 @@ func (cf *CouchDbFile) Explore() error {
 							return err
 						}
 						var buf bytes.Buffer
-						err = js.WriteJSONToBuffer(&buf)
+						err = js.WriteJSONToBuffer(&buf, jsonser.JSONSerExtraAttrs{})
 						slog.Debug(buf.String())
 
 					}
