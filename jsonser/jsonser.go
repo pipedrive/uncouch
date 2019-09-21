@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/pipedrive/uncouch/erldeser"
 	"github.com/pipedrive/uncouch/erlterm"
@@ -16,10 +15,6 @@ import (
 type JSONSer struct {
 	termPool []*erlterm.Term
 	s        *erldeser.Scanner
-}
-
-type JSONSerExtraAttrs struct {
-	ID []byte
 }
 
 // New will return JSON serialiser
@@ -54,15 +49,8 @@ func (js *JSONSer) putTerm(t *erlterm.Term) {
 }
 
 // WriteJSONToBuffer writes Erlang serialised JSON to given buffer as normal JSON
-func (js *JSONSer) WriteJSONToBuffer(collector *bytes.Buffer, extra JSONSerExtraAttrs) error {
-	documentInfo := fmt.Sprintf("{\"_id\": \"%s\", \"doc\": ", strings.TrimSpace(string(extra.ID)))
-	collector.WriteString(documentInfo)
+func (js *JSONSer) WriteJSONToBuffer(collector *bytes.Buffer) error {
 	err := js.readJSONValue(collector)
-	if err != nil {
-		slog.Error(err)
-		return err
-	}
-	_, err = collector.WriteString("}\n")
 	if err != nil {
 		slog.Error(err)
 		return err

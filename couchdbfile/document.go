@@ -28,13 +28,31 @@ func (cf *CouchDbFile) WriteDocument(di *DocumentInfo, output *bytes.Buffer) err
 		slog.Error(err)
 		return err
 	}
-	err = js.WriteJSONToBuffer(output, jsonser.JSONSerExtraAttrs{
-		ID: di.ID,
-	})
+	err = js.WriteJSONToBuffer(output)
 	if err != nil {
 		slog.Error(err)
 		return err
 	}
 
 	return nil
+}
+
+func (cf *CouchDbFile) WriteKeyValue(key string, value string, collector *bytes.Buffer) {
+	cf.WriteString(key, collector)
+	cf.WriteChar(":", collector)
+	cf.WriteString(value, collector)
+}
+
+func (cf *CouchDbFile) WriteString(key string, collector *bytes.Buffer) {
+	_, err := collector.WriteString("\"" + key + "\"")
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (cf *CouchDbFile) WriteChar(char string, collector *bytes.Buffer) {
+	_, err := collector.WriteString(char)
+	if err != nil {
+		panic(err)
+	}
 }

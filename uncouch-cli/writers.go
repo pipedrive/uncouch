@@ -1,105 +1,12 @@
 package main
 
 import (
-	"bufio"
-	"compress/gzip"
 	"fmt"
-	"github.com/pipedrive/uncouch/config"
 	"github.com/pipedrive/uncouch/couchdbfile"
 	"github.com/pipedrive/uncouch/leakybucket"
 	"os"
 	"path"
-	"strings"
 )
-
-type FileContent struct {
-	Cf       *couchdbfile.CouchDbFile
-	Filename string
-}
-
-type FileCompressor struct {
-	f  *os.File
-	gf *gzip.Writer
-	fw *bufio.Writer
-}
-
-func CreateGzipFile(name string) (f FileCompressor, err error) {
-	fi, err := os.Create(name)
-	if err != nil {
-		slog.Error(err)
-		panic(err)
-	}
-	gf := gzip.NewWriter(fi)
-	fw := bufio.NewWriter(gf)
-	f = FileCompressor{fi, gf, fw}
-	return f, err
-}
-
-func WriteGzipFile(f FileCompressor, str *strings.Builder) error {
-	_, err := (f.fw).WriteString(str.String())
-	if err != nil {
-		slog.Error(err)
-	}
-	return err
-}
-
-func CloseGzipFile(f FileCompressor) error {
-	err := f.fw.Flush()
-	if err != nil {
-		slog.Error(err)
-		return err
-	}
-
-	// Close the gzip first.
-	err = f.gf.Close()
-	if err != nil {
-		slog.Error(err)
-		return err
-	}
-
-	err = f.f.Close()
-	if err != nil {
-		slog.Error(err)
-	}
-
-	return err
-}
-
-func gzipFileWriter(str *strings.Builder, filename string) error {
-	f, err := CreateGzipFile(filename)
-	if err != nil {
-		slog.Error(err)
-		return err
-	}
-
-	err = WriteGzipFile(f, str)
-	if err != nil {
-		slog.Error(err)
-		return err
-	}
-
-	err = CloseGzipFile(f)
-	if err != nil {
-		slog.Error(err)
-	}
-
-	return err
-}
-
-func fileWriter(str *strings.Builder, filename string) error {
-	f, err := os.Create(filename)
-	if err != nil {
-		slog.Error(err)
-		return err
-	}
-
-	_, err = f.WriteString(str.String())
-	if err != nil {
-		slog.Error(err)
-		return err
-	}
-	return f.Close()
-}
 
 func writeHeaders(cf *couchdbfile.CouchDbFile, outputdir string) error {
 	err := dumpIDNodeHeaders(cf, cf.Header.IDTreeState.Offset, outputdir)
@@ -206,32 +113,6 @@ func dumpSeqNodeHeaders(cf *couchdbfile.CouchDbFile, offset int64, outputdir str
 	}
 }
 
-func writeData(cf *couchdbfile.CouchDbFile, filename string) error {
-	str := leakybucket.GetStrBuilder()
-
-	err := processSeqNode(cf, cf.Header.SeqTreeState.Offset, str)
-	if err != nil {
-		slog.Error("Error in file:" + filename)
-		slog.Error(err)
-		return err
-	}
-
-	if config.COMPRESS_OUTPUT {
-		err = gzipFileWriter(str, filename)
-	} else {
-		err = fileWriter(str, filename)
-	}
-
-	if err != nil {
-		slog.Error(err)
-	}
-	leakybucket.PutStrBuilder(str)
-
-	// return processIDNode(cf, cf.Header.IDTreeState.Offset)
-	// slog.Debug(termite.GetProfilerData())
-	return err
-}
-
 func processIDNode(cf *couchdbfile.CouchDbFile, offset int64) error {
 	for {
 		kpNode, kvNode, err := cf.ReadIDNode(offset)
@@ -266,7 +147,7 @@ func processIDNode(cf *couchdbfile.CouchDbFile, offset int64) error {
 	}
 }
 
-func processSeqNode(cf *couchdbfile.CouchDbFile, offset int64, str *strings.Builder) error {
+func processSeqNode(cf *couchdbfile.CouchDbFile, offset int64) error {
 	for {
 		kpNode, kvNode, err := cf.ReadSeqNode(offset)
 		if err != nil {
@@ -279,7 +160,7 @@ func processSeqNode(cf *couchdbfile.CouchDbFile, offset int64, str *strings.Buil
 		if kpNode != nil {
 			// Pointer node, dig deeper
 			for _, node := range kpNode.Pointers {
-				err = processSeqNode(cf, node.Offset, str)
+				err = processSeqNode(cf, node.Offset)
 				if err != nil {
 					slog.Error(err)
 					return err
@@ -295,12 +176,9 @@ func processSeqNode(cf *couchdbfile.CouchDbFile, offset int64, str *strings.Buil
 					return err
 				}
 			}
-			str.Grow(len(output.Bytes()))
-			str.Write(output.Bytes())
-			// fmt.Print(output.String())
+			fmt.Print(output.String())
 			leakybucket.PutBuffer(output)
 			return nil
 		}
-		return nil
 	}
 }
