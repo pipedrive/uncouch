@@ -9,6 +9,12 @@ import (
 	"github.com/pipedrive/uncouch/leakybucket"
 )
 
+type CouchDbDocument struct {
+	Id    string
+	Rev   string
+	Value map[string]interface{}
+}
+
 // WriteDocument writes document as JSON object into output buffer
 func (cf *CouchDbFile) WriteDocument(di *DocumentInfo, output *bytes.Buffer) error {
 	// Get buffer

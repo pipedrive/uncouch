@@ -45,15 +45,18 @@ func cmdDataFunc(cmd *cobra.Command, args []string) error {
 	}
 
 	// read JSON from CouchDbFile and send to jsonLines channel
-	jsonLines := make(chan map[string]interface{})
-	go cf.Read(cf.Header.SeqTreeState.Offset, jsonLines)
+	couchDbDocuments := cf.Read(100)
 
 	// read from the channel and print the results
-	_db := strings.Split(path.Base(filename), ".")[0]
-	for line := range jsonLines {
-		// add custom fields if necessary
-		line["_db"] = _db
+	dbName := strings.Split(path.Base(filename), ".")[0]
+	for doc := range couchDbDocuments {
+		line := map[string]interface{}{
+			"_id": doc.Id,
+			"_db": dbName,
+			"doc": doc.Value,
+		}
 		s, err := json.Marshal(line)
+
 		if err != nil {
 			slog.Error(err)
 		}
