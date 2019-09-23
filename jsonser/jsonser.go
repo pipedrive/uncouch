@@ -55,11 +55,6 @@ func (js *JSONSer) WriteJSONToBuffer(collector *bytes.Buffer) error {
 		slog.Error(err)
 		return err
 	}
-	_, err = collector.WriteString("\n")
-	if err != nil {
-		slog.Error(err)
-		return err
-	}
 	return nil
 }
 

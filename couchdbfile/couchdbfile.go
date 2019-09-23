@@ -25,7 +25,7 @@ func New(input io.ReadSeeker, size int64) (cf *CouchDbFile, err error) {
 	cf.size = size
 	header, err := cf.ReadDbHeader()
 	if err != nil {
-		//slog.Error(err)
+		slog.Error(err)
 		return nil, err
 	}
 	cf.Header = *header

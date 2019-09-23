@@ -102,7 +102,7 @@ func (n *KvNode) readFromTermite(t *termite.Termite) error {
 
 	for i := int32(0); i < n.Length; i++ {
 		t1 := t.Children[1].Children[i]
-		n.Documents[i].ID = append([]byte(nil), t1.Children[0].T.Binary...)
+		n.Documents[i].ID = append([]byte(nil), t1.Children[1].Children[0].T.Binary...)
 		n.Documents[i].UpdateSeq = t1.Children[1].Children[0].T.IntegerValue
 		n.Documents[i].Deleted = int8(t1.Children[1].Children[1].T.IntegerValue)
 		n.Documents[i].Size1 = int32(t1.Children[1].Children[2].Children[0].T.IntegerValue)

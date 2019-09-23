@@ -1,7 +1,7 @@
 .DS_Store
 # Ignore dev binary
 uncouch
-/uncouch-cli/uncouch-cli
+uncouch-cli/uncouch-cli
 
 # Binaries for programs and plugins
 *.exe
@@ -17,4 +17,7 @@ uncouch
 *.out
 
 # config file
-/config/values.go
+config/values.go
+
+# project
+.idea/
