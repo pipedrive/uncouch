@@ -1,14 +1,24 @@
-package main
+package cli
 
 import (
 	"fmt"
+	"github.com/pipedrive/uncouch/logger"
+	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 	"os"
 	"strings"
-
-	"github.com/spf13/cobra"
 )
 
-func main() {
+var (
+	log  *zap.Logger
+	slog *zap.SugaredLogger
+)
+
+func init() {
+	log, slog = logger.GetLogger()
+}
+
+func Cli() {
 	// defer profile.Start().Stop()
 	cmdPrint := &cobra.Command{
 		Use:   "print [string to print]",
@@ -36,7 +46,7 @@ For many years people have printed back to the screen.`,
 	}
 
 	rootCmd := &cobra.Command{
-		Use:   "uncouch-cli",
+		Use:   "uncouch",
 		Short: "Manage Uncouch related commands",
 	}
 
