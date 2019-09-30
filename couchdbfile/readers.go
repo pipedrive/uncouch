@@ -195,9 +195,10 @@ func (cf *CouchDbFile) ReadOffset(offset int64, ch chan CouchDbDocument) {
 					panic(err)
 				}
 				cd := CouchDbDocument{
-					Id:    strings.TrimSpace(string(document.ID)),
-					Rev:   "",
-					Value: pl,
+					Id:      strings.TrimSpace(string(document.ID)),
+					Deleted: document.Deleted,
+					Rev:     "",
+					Value:   pl,
 				}
 				ch <- cd
 				leakybucket.PutBuffer(output)
