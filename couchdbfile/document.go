@@ -10,9 +10,10 @@ import (
 )
 
 type CouchDbDocument struct {
-	Id    string
-	Rev   string
-	Value map[string]interface{}
+	Id      string
+	Deleted int8
+	Rev     string
+	Value   map[string]interface{}
 }
 
 // WriteDocument writes document as JSON object into output buffer
