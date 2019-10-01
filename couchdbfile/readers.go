@@ -192,7 +192,7 @@ func (cf *CouchDbFile) ReadOffset(offset int64, ch chan CouchDbDocument) {
 
 				var pl map[string]interface{}
 				if err := json.Unmarshal(output.Bytes(), &pl); err != nil {
-					panic(err)
+					slog.Error(err, "\nOutput:\n", output.String())
 				}
 				cd := CouchDbDocument{
 					Id:      strings.TrimSpace(string(document.ID)),
