@@ -159,16 +159,7 @@ func (cf *CouchDbFile) ReadDbHeader() (*DbHeader, error) {
 	return &header, err
 }
 
-func (cf *CouchDbFile) Read(size int) chan CouchDbDocument {
-	ch := make(chan CouchDbDocument, size)
-	go func() {
-		defer close(ch)
-		cf.ReadOffset(cf.Header.SeqTreeState.Offset, ch)
-	}()
-	return ch
-}
-
-func (cf *CouchDbFile) ReadOffset(offset int64, ch chan CouchDbDocument) {
+func (cf *CouchDbFile) ReadOffset(offset int64, couchDbDocuments []CouchDbDocument) []CouchDbDocument {
 	for {
 		kpNode, kvNode, err := cf.ReadSeqNode(offset)
 		if err != nil {
@@ -180,7 +171,7 @@ func (cf *CouchDbFile) ReadOffset(offset int64, ch chan CouchDbDocument) {
 		if kpNode != nil {
 			// Pointer node, dig deeper
 			for _, node := range kpNode.Pointers {
-				cf.ReadOffset(node.Offset, ch)
+				couchDbDocuments = cf.ReadOffset(node.Offset, couchDbDocuments)
 			}
 		} else if kvNode != nil {
 			for _, document := range kvNode.Documents {
@@ -192,7 +183,7 @@ func (cf *CouchDbFile) ReadOffset(offset int64, ch chan CouchDbDocument) {
 
 				var pl map[string]interface{}
 				if err := json.Unmarshal(output.Bytes(), &pl); err != nil {
-					slog.Error(err, "\nOutput:\n", output.String())
+					panic(err)
 				}
 				cd := CouchDbDocument{
 					Id:      strings.TrimSpace(string(document.ID)),
@@ -200,10 +191,11 @@ func (cf *CouchDbFile) ReadOffset(offset int64, ch chan CouchDbDocument) {
 					Rev:     "",
 					Value:   pl,
 				}
-				ch <- cd
+				couchDbDocuments = append(couchDbDocuments, cd)
 				leakybucket.PutBuffer(output)
 			}
 		}
 		break
 	}
+	return couchDbDocuments
 }

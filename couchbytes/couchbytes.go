@@ -114,7 +114,7 @@ func uncompressBuffer(buf *[]byte) (*[]byte, error) {
 		// Uncompress and go
 		res, err := snappy.Decode(*destBuf, (*buf)[1:])
 		if err != nil {
-			slog.Error("Error decoding snappy", err)
+			slog.Error(err)
 			return nil, err
 		}
 		// Release compressed buffer
