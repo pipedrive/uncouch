@@ -4,8 +4,11 @@ package jsonser
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/pipedrive/uncouch/erldeser"
 	"github.com/pipedrive/uncouch/erlterm"
@@ -270,7 +273,20 @@ func (js *JSONSer) readJSONValue(collector *bytes.Buffer) error {
 			return err
 		}
 	case erldeser.BinaryExt:
-		_, err := collector.WriteString(strconv.Quote(string(t.Binary)))
+		bin := string(t.Binary)
+		quoted := strconv.Quote(bin)
+		if !validate_str(quoted) {
+			log.Info(fmt.Sprintf("String contains invalid characters: %v.", quoted))
+			var err error
+			quoted, err = sanitize(quoted)
+			if err != nil {
+				slog.Error(err)
+				return err
+			}
+			log.Info(fmt.Sprintf("Sanitization result: %v.", quoted))
+		}
+
+		_, err := collector.WriteString(quoted)
 		if err != nil {
 			slog.Error(err)
 			return err
@@ -282,4 +298,25 @@ func (js *JSONSer) readJSONValue(collector *bytes.Buffer) error {
 		return err
 	}
 	return nil
+}
+
+func validate_str(str string) bool {
+	if !strings.Contains(str, `\`) {
+		return true
+	}
+
+	adhocjson := []byte(`{"validate":` + str + `}`)
+
+	return json.Valid(adhocjson)
+}
+
+func sanitize(src string) (string, error) {
+	re, err := regexp.Compile(`(\\[^bfrnt\\\"])`) // Valid escaped characters.
+	if err != nil {
+		slog.Error(err)
+		return "", err
+	}
+	repl := []byte(`\$1`)
+
+	return string(re.ReplaceAll([]byte(src), repl)), err
 }
