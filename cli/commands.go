@@ -29,34 +29,28 @@ func cmdDataFunc(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// read file into memory
-	fileBytes, err := ioutil.ReadAll(f)
-	if err != nil {
-		slog.Error(err)
-		return err
-	}
-	memoryReader := bytes.NewReader(fileBytes)
-
 	// get CouchDbFile
-	cf, err := couchdbfile.New(memoryReader, fi.Size())
+	cf, err := couchdbfile.New(f, fi.Size())
 	if err != nil {
 		slog.Error(err)
 		return err
 	}
 
 	// read JSON from CouchDbFile and send to jsonLines channel
-	couchDbDocuments := cf.Read(100)
+	couchDbDocuments := cf.ReadOffset(cf.Header.SeqTreeState.Offset, []couchdbfile.CouchDbDocument{})
 
 	// read from the channel and print the results
 	dbName := strings.Split(path.Base(filename), ".")[0]
-	for doc := range couchDbDocuments {
+	for _, doc := range couchDbDocuments {
 		line := map[string]interface{}{
-			"_id": doc.Id,
-			"_db": dbName,
-			"doc": doc.Value,
+			"_id":      doc.Id,
+			"_db":      dbName,
+			"_deleted": doc.Deleted,
+		}
+		for k, v := range doc.Value {
+			line[k] = v
 		}
 		s, err := json.Marshal(line)
-
 		if err != nil {
 			slog.Error(err)
 		}
