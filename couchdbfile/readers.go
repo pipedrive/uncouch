@@ -178,12 +178,12 @@ func (cf *CouchDbFile) ReadOffset(offset int64, couchDbDocuments []CouchDbDocume
 				output := leakybucket.GetBuffer()
 				err = cf.WriteDocument(&document, output)
 				if err != nil {
-					panic(err)
+					slog.Error(err)
 				}
 
 				var pl map[string]interface{}
 				if err := json.Unmarshal(output.Bytes(), &pl); err != nil {
-					panic(err)
+					slog.Error(err)
 				}
 				cd := CouchDbDocument{
 					Id:      strings.TrimSpace(string(document.ID)),
