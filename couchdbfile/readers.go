@@ -179,11 +179,13 @@ func (cf *CouchDbFile) ReadOffset(offset int64, couchDbDocuments []CouchDbDocume
 				err = cf.WriteDocument(&document, output)
 				if err != nil {
 					slog.Error(err)
+					continue
 				}
 
 				var pl map[string]interface{}
 				if err := json.Unmarshal(output.Bytes(), &pl); err != nil {
 					slog.Error(err)
+					continue
 				}
 				cd := CouchDbDocument{
 					Id:      strings.TrimSpace(string(document.ID)),
