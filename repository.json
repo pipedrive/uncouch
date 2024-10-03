@@ -1,7 +1,7 @@
 {
     "name": "uncouch",
     "description": "Tool to extract JSON data directly from CouchDB data files",
-    "owner": "DATA",
+    "owner": "Data",
     "region-type": "null",
     "type": "library",
     "status": "released"
